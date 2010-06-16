@@ -1,6 +1,6 @@
 require  File.dirname(__FILE__)+'/test_helper'
 
-class PSCheckOptionsTest < Test::Unit::TestCase
+class TestPSCheckOptions < Test::Unit::TestCase
 
   context "pscheck without options" do
     setup do

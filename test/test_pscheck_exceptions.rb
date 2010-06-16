@@ -1,12 +1,11 @@
 require  File.dirname(__FILE__)+'/test_helper'
 
-class PSCheckExceptionsTest < Test::Unit::TestCase
+class TestPSCheckExceptions < Test::Unit::TestCase
   # code to get us startup before all tests
   class << self
     
     # runs before all tests
     def startup
-      @@dir = "test/fixtures/ps-v4.0.x/"
       @@exception_path = "test/fixtures/known_exceptions.txt"
       @@output = `ruby pscheck.rb -V -x #{@@exception_path} #{@@dir}`
     end
@@ -17,9 +16,9 @@ class PSCheckExceptionsTest < Test::Unit::TestCase
     def suite
       mysuite = super
       def mysuite.run(*args)
-        PSCheckExceptionsTest.startup()
+        TestPSCheckExceptions.startup()
         super
-        PSCheckExceptionsTest.shutdown()
+        TestPSCheckExceptions.shutdown()
       end
       mysuite
     end
@@ -46,28 +45,28 @@ class PSCheckExceptionsTest < Test::Unit::TestCase
     end
   end
     
-  context "pscheck with exception and year 2006" do
+  context "pscheck with exception and year 2009" do
     setup do
-      @output06 = `ruby pscheck.rb -V-y 2006 -x #{@@exception_path} #{@@dir}`
+      @output09 = `ruby pscheck.rb -V-y 2009 -x #{@@exception_path} #{@@dir}`
     end
     
-    should "have only skipped documents in 2006" do
-      assert_match /skipping AMPH9900011803S001/, @output06
-      assert_match /skipping AMPH9900011803S002/, @output06
-      assert_match /Signatures packets checked:\s+10/i, @output06
-      assert_match /Signatures packets skipped:\s+2/i, @output06
+    should "have only skipped documents in 2009" do
+      assert_match /skipping TEST0100000002S001/, @output09
+      assert_match /skipping TEST0100000002S002/, @output09
+      assert_match /Signatures packets checked:\s+69/i, @output09
+      assert_match /Signatures packets skipped:\s+2/i, @output09
     end
   end
 
-  context "pscheck with exception and year 2007" do
+  context "pscheck with exception and year 2010" do
     setup do
-      @output07 = `ruby pscheck.rb -V-y 2007 -x #{@@exception_path} #{@@dir}`
+      @output10 = `ruby pscheck.rb -V-y 2010 -x #{@@exception_path} #{@@dir}`
     end
     
-    should "have only skipped documents in 2007" do
-      assert_match /skipping AMPH9900013350S001/, @output07      
-      assert_match /Signatures packets checked:\s+0/i, @output07
-      assert_match /Signatures packets skipped:\s+1/i, @output07
+    should "have only skipped documents in 2010" do
+      assert_match /skipping TEST0100000045S001/, @output10
+      assert_match /Signatures packets checked:\s+8/i, @output10
+      assert_match /Signatures packets skipped:\s+2/i, @output10
     end
   end
 
@@ -78,20 +77,21 @@ class PSCheckExceptionsTest < Test::Unit::TestCase
 
     should "have a list of known exceptions loaded" do
       assert_match /known file exceptions list loaded/i, @@output
-      assert_match /AMPH9900013350: Test a document in year 2007/i, @@output
-      assert_match /AMPH9900011803: File is corrupted on disk/i, @@output
+      assert_match /TEST0100000045: Test a document in year 2010/i, @@output
+      assert_match /TEST0100000002: File is corrupted on disk/i, @@output
       assert_match /2 known file exceptions loaded/, @@output
     end
     
     should "have skipped signatures for known exceptions documents" do
-      assert_match /skipping AMPH9900011803S001/, @@output
-      assert_match /skipping AMPH9900011803S002/, @@output
-      assert_match /skipping AMPH9900013350S001/, @@output
+      assert_match /skipping TEST0100000045S001/, @@output
+      assert_match /skipping TEST0100000045S002/, @@output
+      assert_match /skipping TEST0100000002S001/, @@output
+      assert_match /skipping TEST0100000002S002/, @@output
     end
     
     should "have the correct sums of checked vs skipped signatures" do
-      assert_match /Signatures packets checked:\s+10/i, @@output
-      assert_match /Signatures packets skipped:\s+3/i, @@output
+      assert_match /Signatures packets checked:\s+77/i, @@output
+      assert_match /Signatures packets skipped:\s+4/i, @@output
     end
   end
   

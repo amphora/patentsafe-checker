@@ -326,7 +326,7 @@ class Repository
         sig_errors = signature.validate
         
         # check if user public key can be found
-        if @users[signature.signer_id].keys.values.include?(signature.public_key)
+        if @users[signature.signer_id].keys.include?(signature.public_key)
           LOG.info "  - OK:  User public key is consistent with database"
         else
           LOG.error "  - ERROR: #{signature.signature_id unless @verbose} User public key not found (this may not be a problem - make sure you can find the identity certificate)"
@@ -400,23 +400,32 @@ end
 # User is a wrapper around the user xml document
 class User
   attr_accessor :verbose
-  attr_reader :user_id, :name, :keys
+  attr_reader :version, :user_id, :name, :keys
   
   def initialize(options={})
     # path, verbose=false
     @path = options[:path]
     @verbose = options[:verbose] || false
-    @keys = Hash.new
+    @keys = Array.new
     
     if @path
       @xml = REXML::Document.new(File.read(@path))
       # load the document on initialize "eagerly"
+      @version = @xml.root.attribute("version").to_s
       @user_id = @xml.root.attribute("userId").to_s
       @name = @xml.root.get_text("name").value().to_s
-      @xml.elements.each("user/keys/keyPair") do |elem|
-        @keys[elem.attribute("keyId").to_s] = elem.get_text("encodedKey").to_s
+      key = @xml.root.elements["keyPair"]
+      @keys << key.get_text("encodedKey").value().to_s if key
+      # load old keys too
+      keys_path = File.join(File.split(@path)[0], "#{@user_id.downcase}.keys")
+
+      if File.exist?( keys_path )
+        keys_xml = REXML::Document.new("<keys>#{File.open(keys_path, "r").read}</keys>")
+        keys_xml.root.elements.each("keyPair") do |old_key|
+          @keys << old_key.get_text("encodedKey").value().to_s
+        end
       end
-      
+
       LOG.info " - loaded #{@name} [#{@user_id}] with #{@keys.length} keys"
     end
   end
@@ -504,7 +513,7 @@ class Signature
     if signature_text_valid?
       LOG.info "  - OK:  Generated signature text is consistent with signature packet"
     else
-      LOG.error "  - ERROR: #{@signature_id unless @verbose} Generated signature is inconsistent with signature packet"
+      LOG.error "  - ERROR: #{@signature_id unless @verbose} Generated signature text is inconsistent with signature packet"
       @errors[:invalid_signature_text] = [@generated_signature_text, @text] 
     end
     

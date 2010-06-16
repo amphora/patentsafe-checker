@@ -1,12 +1,11 @@
 require  File.dirname(__FILE__)+'/test_helper'
 
-class PSCheckVerboseTest < Test::Unit::TestCase
+class TestPSCheckVerbose < Test::Unit::TestCase
   # code to get us startup before all tests
   class << self
     
     # runs before all tests
     def startup
-      @@dir = "test/fixtures/ps-v4.0.x/"
       @@output = `ruby pscheck.rb -V #{@@dir}`
     end
     
@@ -16,9 +15,9 @@ class PSCheckVerboseTest < Test::Unit::TestCase
     def suite
       mysuite = super
       def mysuite.run(*args)
-        PSCheckVerboseTest.startup()
+        TestPSCheckVerbose.startup()
         super
-        PSCheckVerboseTest.shutdown()
+        TestPSCheckVerbose.shutdown()
       end
       mysuite
     end
@@ -35,31 +34,32 @@ class PSCheckVerboseTest < Test::Unit::TestCase
     
     should "have user loading text" do
       # make sure we can test on Windows as well (paths are different)
-      assert_match /loading users from test[\\\/]+fixtures[\\\/]+ps-v4.0.x[\\\/]+data[\\\/]+users/i, @@output
+      assert_match /loading users from test[\\\/]+fixtures[\\\/]+ps-repositories[\\\/]+4.8[\\\/]+data[\\\/]+users/i, @@output
     end
 
-    should "have loaded six users" do
-      assert_match /6 users loaded/i, @@output
+    should "have loaded seven users" do
+      assert_match /7 users loaded/i, @@output
     end
 
     should "have the correct list of users" do
+      assert_match /loaded Charles Baskerville \[baskerville\] with 2 keys/i, @@output
+      assert_match /loaded Sherlock Holmes \[holmes\] with 1 keys/i, @@output
       assert_match /loaded Installer \[installer\] with 0 keys/i, @@output
-      assert_match /loaded A Witness \[witness\] with 0 keys/i, @@output
-      assert_match /loaded Kevin Pearcey \(kevinp\) \[kevinp\] with 51 keys/i, @@output
-      assert_match /loaded Kevin Pearcey \(p\) \[p\] with 7 keys/i, @@output
-      assert_match /loaded User 1 \[user1\] with 0 keys/i, @@output
-      assert_match /loaded Stress Test User \[user-00000\] with 0 keys/i, @@output
+      assert_match /loaded James Mortimer \[mortimer\] with 1 keys/i, @@output
+      assert_match /loaded Jonathan Small \[small\] with 1 keys/i, @@output
+      assert_match /loaded John Watson \[watson\] with 1 keys/i, @@output
+      assert_match /loaded Henry Wood \[wood\] with 0 keys/i, @@output
     end
     
     should "have validating text" do
-      assert_match /validating AMPH9900011803S001 at/i, @@output
+      assert_match /validating TEST0100000003S001 at/i, @@output
     end
     
     should "have error text for known invalid document" do
-      assert_match /ERROR:  Generated signature is inconsistent with signature packet/i, @@output
+      assert_match /ERROR:  Generated signature text is inconsistent with signature packet/i, @@output
       assert_match /ERROR:  Generated document hash is inconsistent with signature packet/i, @@output
     end
-    
+``    
     should "have error text for known missing public key" do
       assert_match /ERROR:  User public key not found/i, @@output
     end
@@ -68,25 +68,25 @@ class PSCheckVerboseTest < Test::Unit::TestCase
       assert_match /PatentSafe Checker Summary Report/i, @@output
     end
     
-    should "have checked thirteen signatures" do
-      assert_match /Signatures packets checked:\s+13/i, @@output
+    should "have checked eighty one signatures" do
+      assert_match /Signatures packets checked:\s+81/i, @@output
     end
     
     should "have the errors summary" do
       assert_match /-- Errors --/i, @@output
-      assert_match /Corrupt signatures:\s+1/i, @@output
       assert_match /Missing public key:\s+1/i, @@output
       assert_match /Invalid signature texts:\s+1/i, @@output
       assert_match /Invalid content hash:\s+1/i, @@output
+      assert_match /Invalid signatures:\s+1/i, @@output
       # How to test missing OpenSSL?
       # assert_match /Skipped signatures\*:\s+13/i, @@output
     end
     
     should "have the successful summary" do
       assert_match /-- Successful checks --/i, @@output
-      assert_match /Public keys found:\s+12/i, @@output
-      assert_match /Signature texts:\s+12/i, @@output
-      assert_match /Content hashes:\s+12/i, @@output
+      assert_match /Public keys found:\s+80/i, @@output
+      assert_match /Signature texts:\s+80/i, @@output
+      assert_match /Content hashes:\s+80/i, @@output
       # Test missing OpenSSL?
       # assert_match /Validated signatures\*:\s+0/i, @@output
     end

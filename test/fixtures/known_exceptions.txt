@@ -3,7 +3,7 @@
 #
 # i.e.
 #
-# AMPH9900011803: This file is corrupt because the hard-drive crashed
+# TEST0100000003: This file is corrupt because the hard-drive crashed
 
-AMPH9900011803: File is corrupted on disk.
-AMPH9900013350: Test a document in year 2007.
+TEST0100000002: File is corrupted on disk.
+TEST0100000045: Test a document in year 2010.
