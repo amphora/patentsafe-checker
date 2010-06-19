@@ -58,14 +58,6 @@ Known exception file format - each file listed on a new line with a space after 
   AMPH9900011804: This file is known to be corrupt 20 Apr 07
 </pre>
 
-h2. Tests
-
-The checker script contains a test suite to verify operations using example files under @test/fixtures@.
-
-Use @rake test@ to run the tests. 
-
-The output will tell you what files were loaded and how long the suite took to run. It will also report the number of tests, assertions, failures and errors. 
-
 h1. About this document
 
 This document is formatted in "Textile":http://hobix.com/textile/
