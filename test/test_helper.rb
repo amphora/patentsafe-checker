@@ -10,7 +10,7 @@ rescue LoadError
 end
 
 module TestHelper
-  @@dir = "test/fixtures/ps-repositories/4.8/"
+  @@dir = "test/fixtures/ps-repositories/5.0/"
 end
 
 class Test::Unit::TestCase

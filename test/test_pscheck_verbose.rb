@@ -34,7 +34,7 @@ class TestPSCheckVerbose < Test::Unit::TestCase
     
     should "have user loading text" do
       # make sure we can test on Windows as well (paths are different)
-      assert_match /loading users from test[\\\/]+fixtures[\\\/]+ps-repositories[\\\/]+4.8[\\\/]+data[\\\/]+users/i, @@output
+      assert_match /loading users from test[\\\/]+fixtures[\\\/]+ps-repositories[\\\/]+5.0[\\\/]+data[\\\/]+users/i, @@output
     end
 
     should "have loaded seven users" do
