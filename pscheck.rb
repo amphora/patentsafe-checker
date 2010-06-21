@@ -77,7 +77,7 @@ LOG = Logger.new(STDOUT)
 # To see what is really happening - jump to the process_command method
 #
 class App
-  VERSION = '4.1.0'
+  VERSION = '4.8'
 
   attr_reader :options
 
