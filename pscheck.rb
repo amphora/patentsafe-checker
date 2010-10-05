@@ -580,7 +580,10 @@ class String
   
 end
 
-
-# Create and run the application
-app = App.new(ARGV, STDIN)
-app.run
+# Only run the app if this was called from the command line rather than included as a library
+# The special variable $" is an array of the files which have been required/included
+if $".include?("pscheck.rb") == true
+  # Create and run the application
+  app = App.new(ARGV, STDIN)
+  app.run
+end
