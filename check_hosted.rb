@@ -45,6 +45,10 @@ require 'ostruct'
 # The Repository checker 
 require "pscheck"
 
+# setup our logger STDOUT for now
+LOG = Logger.new(STDOUT)
+# Only report errors
+LOG.level = Logger::FATAL
 
 # This is pretty much copied from the pscheck.rb file
 class HostedChecker
@@ -127,16 +131,13 @@ class HostedChecker
         # This doesn't work on Windows but who cares? We only host on Unix
         repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
         if File.exists?(repository_directory)
-          puts "========================================================================================================================"
-          puts "Running on #{repository_directory}"
-          puts "========================================================================================================================"
-          repo = Repository.new(:base_path => repository_directory, 
-                                :year => nil, 
-                                :known_exceptions => nil,
-                                :verbose => false)
+          LOG.info "========================================================================================================================"
+          LOG.info "Running on #{repository_directory}"
+          LOG.info "========================================================================================================================"
+          repo = Repository.new(:base_path => repository_directory)
           repo.check
         else
-          puts "**** No directory #{repository_directory}"
+          LOG.info "**** No directory #{repository_directory}"
         end
         
       end
