@@ -41,13 +41,14 @@
 # Things we need to process command line arguments
 require 'optparse' 
 require 'rdoc/usage'
+require 'ostruct'
 
 # The Repository checker 
-require "pscheck"
+#require "pscheck"
 
 
 # This is pretty much copied from the pscheck.rb file
-class App
+class HostedChecker
   attr_reader :options
 
   def initialize(arguments, stdin)
@@ -148,8 +149,6 @@ class App
     end    
 end
 
-
-
 # Create and run the application
-app = App.new(ARGV, STDIN)
-app.run
+hosted_checker = HostedChecker.new(ARGV, STDIN)
+hosted_checker.run
