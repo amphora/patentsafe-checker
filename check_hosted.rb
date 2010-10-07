@@ -16,9 +16,6 @@
 #
 # == Options
 #   -h, --help          Displays help message
-#   -v, --version       Display the version, then exit
-#   -q, --quiet         Output as little as possible, overrides verbose
-#   -V, --verbose       Verbose output
 #
 # == Author
 #   Amphora Research Systems, Ltd.
@@ -79,9 +76,6 @@ class HostedChecker
       # specify options
       opts = OptionParser.new 
       opts.on('-h', '--help')         { output_help }
-      opts.on('-V', '--verbose')      { @options.verbose = true }  
-      opts.on('-q', '--quiet')        { @options.quiet = true }
-      opts.on('-y', '--year [yyyy]')  { |yyyy| @options.year = yyyy }
       opts.parse!(@arguments) rescue return false
       process_options
       true      
@@ -139,7 +133,7 @@ class HostedChecker
           repo = Repository.new(:base_path => repository_directory, 
                                 :year => nil, 
                                 :known_exceptions => nil,
-                                :verbose => @options.verbose)
+                                :verbose => false)
           repo.check
         else
           puts "**** No directory #{repository_directory}"
