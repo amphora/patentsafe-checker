@@ -9,6 +9,8 @@
 #   
 #     ruby check_hosted.rb /base/dir path/suffix
 #
+#     On Duane run "ruby check_hosted.rb /zones root/export/home/apps/patentsafe" as root
+#
 # == Usage 
 #   check_hosted.rb [options] base_directory path_inside_each_hit
 #
