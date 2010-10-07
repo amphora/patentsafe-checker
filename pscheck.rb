@@ -66,8 +66,10 @@ require 'openssl'
 require 'logger'
 require 'yaml'
 
-# setup our logger STDOUT for now
-LOG = Logger.new(STDOUT)
+# setup the logger if this is the main file
+if __FILE__ == $PROGRAM_NAME
+	LOG = Logger.new(STDOUT)
+end
 
 
 # App is a wrapper around the operations needed to process PatentSafe 
@@ -358,7 +360,7 @@ class Repository
       total = @results.checked_signatures
       log ""
       log "-----------------------------------------------------------------------"
-      log "PatentSafe Checker Summary Report"
+      log "PatentSafe Checker Summary Report for #{@path}"
       log "-----------------------------------------------------------------------"
       log "Run at:                     #{@check_started_at}"
       log ""
