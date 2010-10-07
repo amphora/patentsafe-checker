@@ -3,7 +3,8 @@
 # == Synopsis 
 #   Script to scan the PatentSafe document repository checking for
 #   document and signature validity. Mainly intended for Amphora's 
-#   Hosted PatentSafe servers (and their backup)
+#   Hosted PatentSafe servers (and their backup). Produces no output
+#   unless there is a problem, so can be run from cron
 #
 # == Examples
 #   
