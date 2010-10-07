@@ -56,8 +56,6 @@ class HostedChecker
 
     # set defaults
     @options = OpenStruct.new
-    @options.verbose = false
-    @options.quiet = false
   end
 
   # Parse options, check arguments, then process the command
