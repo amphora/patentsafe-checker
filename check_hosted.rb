@@ -48,7 +48,7 @@ require "pscheck"
 # setup our logger STDOUT for now
 LOG = Logger.new(STDOUT)
 # Only report errors
-LOG.level = Logger::FATAL
+LOG.level = Logger::ERROR
 
 # This is pretty much copied from the pscheck.rb file
 class HostedChecker

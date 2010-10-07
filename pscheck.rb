@@ -103,8 +103,9 @@ class App
       if @options.verbose
         LOG.level = Logger::INFO
       elsif @options.quiet
-        LOG.level = Logger::FATAL
+        LOG.level = Logger::ERROR
       else
+        # The default is WARN
         LOG.level = Logger::WARN
       end
       # arguments then the pscheck command itself
@@ -192,9 +193,9 @@ class App
     
     # The guts of pscheck
     def process_command
-      log ""
-      log version_text
-      log "-----------------------------------------------------------------------"
+      LOG.info ""
+      LOG.info version_text
+      LOG.info "-----------------------------------------------------------------------"
       repo = Repository.new(:base_path => @patentsafe_dir, 
                             :year => @options.year, 
                             :known_exceptions => @known_exceptions,
@@ -202,10 +203,6 @@ class App
       repo.check
     end
     
-    # wrapper around logger call
-    def log(msg, severity="unknown")
-      LOG.send(severity.to_sym, msg)
-    end
 end
 
 
@@ -257,7 +254,7 @@ class Repository
     LOG.info "PatentSafe Check Start at #{@check_started_at}\n"
     
     unless openssl_sha512?
-      log "!! OpenSSL Digest does not support SHA512 - signatures can not be validated. !!\n"
+      LOG.fatal "!! OpenSSL Digest does not support SHA512 - signatures can not be validated. !!\n"
     end
     
     unless @known_exceptions.empty?
@@ -358,43 +355,38 @@ class Repository
     # Format all the results for the summary report
     def generate_summary_report
       total = @results.checked_signatures
-      log ""
-      log "-----------------------------------------------------------------------"
-      log "PatentSafe Checker Summary Report for #{@path}"
-      log "-----------------------------------------------------------------------"
-      log "Run at:                     #{@check_started_at}"
-      log ""
-      log "Signatures packets checked: #{total}"
+      LOG.warn ""
+      LOG.warn "-----------------------------------------------------------------------"
+      LOG.warn "PatentSafe Checker Summary Report for #{@path}"
+      LOG.warn "-----------------------------------------------------------------------"
+      LOG.warn "Run at:                     #{@check_started_at}"
+      LOG.warn ""
+      LOG.warn "Signatures packets checked: #{total}"
       unless @known_exceptions.empty?
-        log "Signatures packets skipped: #{@results.known_files_skipped} (Known exceptions)"
+        LOG.warn "Signatures packets skipped: #{@results.known_files_skipped} (Known exceptions)"
       end
-      log ""
+      LOG.warn ""
       unless @results.errors.empty?
-        log "-- Errors --" 
-        log " Corrupt signatures:        #{@results.corrupt_signatures}" if @results.corrupt_signatures > 0
-        log " Missing public key:        #{@results.missing_keys}" if @results.missing_keys > 0
-        log " Invalid signature texts:   #{@results.invalid_signature_texts}" if @results.invalid_signature_texts > 0
-        log " Invalid content hash:      #{@results.invalid_content_hashes}" if @results.invalid_content_hashes > 0
-        log " Invalid signatures:        #{@results.invalid_signatures}" if @results.invalid_signatures > 0 || openssl_sha512?
-        log " Skipped signatures*:       #{@results.skipped_signatures}" if @results.skipped_signatures > 0
-        log ""
+        LOG.warn "-- Errors --" 
+        LOG.warn " Corrupt signatures:        #{@results.corrupt_signatures}" if @results.corrupt_signatures > 0
+        LOG.warn " Missing public key:        #{@results.missing_keys}" if @results.missing_keys > 0
+        LOG.warn " Invalid signature texts:   #{@results.invalid_signature_texts}" if @results.invalid_signature_texts > 0
+        LOG.warn " Invalid content hash:      #{@results.invalid_content_hashes}" if @results.invalid_content_hashes > 0
+        LOG.warn " Invalid signatures:        #{@results.invalid_signatures}" if @results.invalid_signatures > 0 || openssl_sha512?
+        LOG.warn " Skipped signatures*:       #{@results.skipped_signatures}" if @results.skipped_signatures > 0
+        LOG.warn ""
       end
-      log "-- Successful checks --"
-      log " Public keys found:         #{total - @results.missing_keys}"
-      log " Signature texts:           #{total - @results.invalid_signature_texts}"
-      log " Content hashes:            #{total - @results.invalid_content_hashes}"
-      log " Valid signatures:          #{total - @results.invalid_signatures}" if openssl_sha512?
-      log " Validated signatures*:     #{total - @results.skipped_signatures}"
-      log ""
-      log "  * Signatures could not be validated as the installed " unless openssl_sha512?
-      log "    version of OpenSSL does not support SHA512." unless openssl_sha512?
-      log "-----------------------------------------------------------------------"            
-      log ""
-    end
-    
-    # wrapper around logger call
-    def log(msg, severity="unknown")
-      LOG.send(severity.to_sym, msg)
+      LOG.warn "-- Successful checks --"
+      LOG.warn " Public keys found:         #{total - @results.missing_keys}"
+      LOG.warn " Signature texts:           #{total - @results.invalid_signature_texts}"
+      LOG.warn " Content hashes:            #{total - @results.invalid_content_hashes}"
+      LOG.warn " Valid signatures:          #{total - @results.invalid_signatures}" if openssl_sha512?
+      LOG.warn " Validated signatures*:     #{total - @results.skipped_signatures}"
+      LOG.warn ""
+      LOG.fatal "  * Signatures could not be validated as the installed " unless openssl_sha512?
+      LOG.fatal "    version of OpenSSL does not support SHA512." unless openssl_sha512?
+      LOG.warn "-----------------------------------------------------------------------"            
+      LOG.warn ""
     end
 end
 
