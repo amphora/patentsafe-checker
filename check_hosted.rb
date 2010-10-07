@@ -44,7 +44,7 @@ require 'rdoc/usage'
 require 'ostruct'
 
 # The Repository checker 
-#require "pscheck"
+require "pscheck"
 
 
 # This is pretty much copied from the pscheck.rb file

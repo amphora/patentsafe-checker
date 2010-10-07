@@ -581,9 +581,10 @@ class String
 end
 
 # Only run the app if this was called from the command line rather than included as a library
-# The special variable $" is an array of the files which have been required/included
-if $".include?("pscheck.rb") == false
-  # Create and run the application
-  app = App.new(ARGV, STDIN)
-  app.run
+if __FILE__ == $PROGRAM_NAME
+    # Create and run the application
+    app = App.new(ARGV, STDIN)
+    app.run
 end
+
+
