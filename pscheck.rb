@@ -211,7 +211,8 @@ class App
                             :known_exceptions => @known_exceptions,
                             :verbose => @options.verbose,
                             :docfile => @options.docfile,
-                            :sigfile => @options.sigfile)
+                            :sigfile => @options.sigfile,
+                            :format => @options.format)
       repo.check
     end
     
@@ -233,6 +234,7 @@ class Repository
     @verbose = options[:verbose] || false
     @docfile = options[:docfile]
     @sigfile = options[:sigfile]
+    @format = options[:format]
     @users = Hash.new
     @docs = Array.new
     @sigs = Array.new
@@ -351,7 +353,7 @@ class Repository
         
         @results.checked_signatures += 1
         # add the sig to the array if needed
-        @sigs << [signature.signature_id, signature.value] if @sigfile
+        @sigs <<  signature.to_row if @sigfile
         
         # tally errors here to save time
         unless sig_errors.empty?
@@ -376,32 +378,10 @@ class Repository
       
       # sigfile
       File.open(@sigfile, "w+") do |f|
-        @sigs.each do |sig|
-          
-        end if @sigs
+        f.puts Formatter.format(@format.to_s.downcase.to_sym, Signature.columns, @sigs)
       end if @sigfile
 
       # docfile
-    end
-    
-    def format(row, format ="csv")
-      # 
-    end
-    
-    def csv_format(row)
-      # "colname", "colname"
-      # "val", "val"
-      # "val", "val"
-    end
-    
-    def json_format(row)
-      # { ""
-      #  
-      # }
-    end
-    
-    def quote(val)
-      %Q|"#{val}"|
     end
     
     # Format all the results for the summary report
@@ -510,6 +490,14 @@ class Signature
     end
   end
   
+  def self.columns
+    ["Signature ID", "Value"]
+  end
+  
+  def to_row
+    [signature_id, value]
+  end
+  
   def signed_content_path
     File.dirname(@path).to_s/@content_filename
   end
@@ -597,6 +585,83 @@ class Signature
     public_key_valid?
   end
   
+end
+
+
+# OutputFormatter
+class Formatter
+  def self.format(fmt, columns, rows)
+    self.new(fmt).format(columns, rows)
+  end
+  
+  def initialize(format = :csv)
+    @format = format
+    mod = "#{format.to_s.capitalize}Formatter"
+    # include the formatter we need to use
+    # include Class.const_get()
+    self.class.instance_eval("include #{mod}")
+  end
+    
+  def format(columns, rows)
+    @columns = columns
+    @col_count = columns.length
+    @rows = rows
+    @row_count = rows.length
+    
+    "".tap do |out|
+      out << header
+      rows.each_with_index do |r, i|
+        out << row(r, i)
+      end
+      out << footer
+    end
+  end
+  
+  def quote(val)
+    %Q|"#{val}"|
+  end
+end
+
+
+## 
+# Format a 'row' in csv format
+module CsvFormatter
+  def header
+    @columns.map{|v| quote(v)}.join(",") + "\n"
+  end
+  
+  def row(r, ri)
+    r.map{|v| quote(v)}.join(",") + "\n"
+  end
+  
+  def footer
+    ""
+  end
+end
+
+
+##
+# Format a 'row' in json format - makes the object look like a hash
+module JsonFormatter
+  def header
+    "[\n"
+  end
+  
+  def row(r, ri)
+    "".tap do |out|
+      out << "  {"
+      @columns.each_with_index do |col, i|
+         out << "#{quote(col)}:#{quote(r[i])}"
+         out << (i == @col_count-1 ? "" : ",")
+      end
+      out << "}"
+      out << (ri == @row_count-1 ? "\n" : ",\n")
+    end
+  end
+  
+  def footer
+    "]\n"
+  end
 end
 
 
