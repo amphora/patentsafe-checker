@@ -24,6 +24,10 @@
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Verbose output
 #   -y, --year          Only scan year given
+#   -d, --docfile       Filename to output list of documents
+#   -s, --sigfile       Filename to output list of signatures
+#   -c, --csv           Output docfile/sigfile in csv format [Default]
+#   -j, --json          Output docfile/sigfile in json format
 #   -x, --exceptions    Path to file with a list of known exceptions
 #                       these files are skipped during validation
 #
@@ -122,21 +126,27 @@ class App
     def parsed_options?
       # specify options
       opts = OptionParser.new 
-      opts.on('-v', '--version')      { output_version ; exit 0 }
-      opts.on('-h', '--help')         { output_help }
-      opts.on('-V', '--verbose')      { @options.verbose = true }  
-      opts.on('-q', '--quiet')        { @options.quiet = true }
-      opts.on('-y', '--year [yyyy]')  { |yyyy| @options.year = yyyy }
-      opts.on('-x', '--exceptions [expath]')   { |expath| @options.exceptions_path = expath }
+      opts.on('-v', '--version')             { output_version ; exit 0 }
+      opts.on('-h', '--help')                { output_help }
+      opts.on('-V', '--verbose')             { @options.verbose = true }  
+      opts.on('-q', '--quiet')               { @options.quiet = true }
+      opts.on('-y', '--year [yyyy]')         { |yyyy| @options.year = yyyy }
+      opts.on('-d', '--docfile [docfilename]')  { |docfilename| @options.docfile = docfilename }
+      opts.on('-s', '--sigfile [sigfilename]')  { |sigfilename| @options.sigfile = sigfilename }
+      opts.on('-c', '--csv')                 { @options.format = 'csv' }
+      opts.on('-j', '--json')                { @options.format = 'json' }
+      opts.on('-x', '--exceptions [expath]') { |expath| @options.exceptions_path = expath }
+      
       opts.parse!(@arguments) rescue return false
       process_options
-      true      
+      true
     end
 
     # Performs post-parse processing on options
     def process_options
       @options.verbose = false if @options.quiet
-
+      @options.format ||= 'csv'
+      
       if @options.exceptions_path
         # check if file passed in on -x is there
         unless File.exist?(@options.exceptions_path)
@@ -197,9 +207,11 @@ class App
       LOG.info version_text
       LOG.info "-----------------------------------------------------------------------"
       repo = Repository.new(:base_path => @patentsafe_dir, 
-                            :year => @options.year, 
+                            :year => @options.year,
                             :known_exceptions => @known_exceptions,
-                            :verbose => @options.verbose)
+                            :verbose => @options.verbose,
+                            :docfile => @options.docfile,
+                            :sigfile => @options.sigfile)
       repo.check
     end
     
@@ -219,7 +231,11 @@ class Repository
     @year = options[:year]
     @known_exceptions = options[:known_exceptions] || {}
     @verbose = options[:verbose] || false
+    @docfile = options[:docfile]
+    @sigfile = options[:sigfile]
     @users = Hash.new
+    @docs = Array.new
+    @sigs = Array.new
     # results storage
     @results                          = OpenStruct.new
     @results.errors                   = Hash.new
@@ -273,6 +289,7 @@ class Repository
     @check_finished_at = DateTime.now    
     LOG.info "\nPatentSafe Check Finished at #{@check_finished_at}"
     
+    generate_output_files
     generate_summary_report
   end
   
@@ -333,6 +350,8 @@ class Repository
         end
         
         @results.checked_signatures += 1
+        # add the sig to the array if needed
+        @sigs << [signature.signature_id, signature.value] if @sigfile
         
         # tally errors here to save time
         unless sig_errors.empty?
@@ -351,7 +370,40 @@ class Repository
   end
   
   private 
-  
+    
+    def generate_output_files
+      # overwrite old file
+      
+      # sigfile
+      File.open(@sigfile, "w+") do |f|
+        @sigs.each do |sig|
+          
+        end if @sigs
+      end if @sigfile
+
+      # docfile
+    end
+    
+    def format(row, format ="csv")
+      # 
+    end
+    
+    def csv_format(row)
+      # "colname", "colname"
+      # "val", "val"
+      # "val", "val"
+    end
+    
+    def json_format(row)
+      # { ""
+      #  
+      # }
+    end
+    
+    def quote(val)
+      %Q|"#{val}"|
+    end
+    
     # Format all the results for the summary report
     def generate_summary_report
       total = @results.checked_signatures
