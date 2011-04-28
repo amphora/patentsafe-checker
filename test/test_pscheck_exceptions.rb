@@ -53,8 +53,8 @@ class TestPSCheckExceptions < Test::Unit::TestCase
     should "have only skipped documents in 2009" do
       assert_match /skipping TEST0100000002S001/, @output09
       assert_match /skipping TEST0100000002S002/, @output09
-      assert_match /Signatures packets checked:\s+69/i, @output09
-      assert_match /Signatures packets skipped:\s+2/i, @output09
+      assert_match /Signature packets checked:\s+69/i, @output09
+      assert_match /Signature packets skipped:\s+2/i, @output09
     end
   end
 
@@ -65,8 +65,8 @@ class TestPSCheckExceptions < Test::Unit::TestCase
     
     should "have only skipped documents in 2010" do
       assert_match /skipping TEST0100000045S001/, @output10
-      assert_match /Signatures packets checked:\s+8/i, @output10
-      assert_match /Signatures packets skipped:\s+2/i, @output10
+      assert_match /Signature packets checked:\s+8/i, @output10
+      assert_match /Signature packets skipped:\s+2/i, @output10
     end
   end
 
@@ -90,8 +90,8 @@ class TestPSCheckExceptions < Test::Unit::TestCase
     end
     
     should "have the correct sums of checked vs skipped signatures" do
-      assert_match /Signatures packets checked:\s+77/i, @@output
-      assert_match /Signatures packets skipped:\s+4/i, @@output
+      assert_match /Signature packets checked:\s+77/i, @@output
+      assert_match /Signature packets skipped:\s+4/i, @@output
     end
   end
   

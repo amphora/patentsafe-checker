@@ -37,7 +37,7 @@ class TestPSCheckDefault < Test::Unit::TestCase
     end
     
     should "have checked eighty one signatures" do
-      assert_match /Signatures packets checked:\s+81/i, @@output
+      assert_match /Signature packets checked:\s+81/i, @@output
     end
     
     should "have the errors summary" do

@@ -36,8 +36,9 @@ class TestPSCheckQuiet < Test::Unit::TestCase
       assert_no_match /validating TEST0100000003S001 at/i, @@output
     end
     
-    should "not have the signatures checked count" do
-      assert_no_match /Signatures packets checked:\s+81/i, @@output
+    should "not have the checked counts" do
+      assert_no_match /Document packets checked:\s+53/i, @@output
+      assert_no_match /Signature packets checked:\s+81/i, @@output
     end
     
     should "not have the errors summary" do

@@ -50,8 +50,12 @@ class TestPSCheckVerbose < Test::Unit::TestCase
       assert_match /loaded John Watson \[watson\] with 1 keys/i, @@output
       assert_match /loaded Henry Wood \[wood\] with 0 keys/i, @@output
     end
+
+    should "have document validating text" do
+      assert_match /validating TEST0100000005 at/i, @@output
+    end
     
-    should "have validating text" do
+    should "have signature validating text" do
       assert_match /validating TEST0100000003S001 at/i, @@output
     end
     
@@ -68,8 +72,12 @@ class TestPSCheckVerbose < Test::Unit::TestCase
       assert_match /PatentSafe Checker Summary Report/i, @@output
     end
     
+    should "have checked fifty three documents" do
+      assert_match /Document packets checked:\s+53/i, @@output
+    end
+    
     should "have checked eighty one signatures" do
-      assert_match /Signatures packets checked:\s+81/i, @@output
+      assert_match /Signature packets checked:\s+81/i, @@output
     end
     
     should "have the errors summary" do
@@ -84,9 +92,12 @@ class TestPSCheckVerbose < Test::Unit::TestCase
     
     should "have the successful summary" do
       assert_match /-- Successful checks --/i, @@output
+      assert_match /Documents w\/o hash:\s+5/i, @@output
+      assert_match /Document hashes:\s+48/i, @@output
       assert_match /Public keys found:\s+80/i, @@output
       assert_match /Signature texts:\s+80/i, @@output
       assert_match /Content hashes:\s+80/i, @@output
+      assert_match /Valid signatures:\s+80/i, @@output
       # Test missing OpenSSL?
       # assert_match /Validated signatures\*:\s+0/i, @@output
     end

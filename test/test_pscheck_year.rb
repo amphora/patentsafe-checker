@@ -31,7 +31,7 @@ class TestPSCheckYear < Test::Unit::TestCase
     end
 
     should "have checked seventy one signatures" do
-      assert_match /Signatures packets checked:\s+71/i, @@output09
+      assert_match /Signature packets checked:\s+71/i, @@output09
     end
     
     should "have the errors summary" do
@@ -58,7 +58,7 @@ class TestPSCheckYear < Test::Unit::TestCase
   context "pscheck with verbose and year as 2010" do
 
     should "have checked ten signatures" do
-      assert_match /Signatures packets checked:\s+10/i, @@output10
+      assert_match /Signature packets checked:\s+10/i, @@output10
     end
     
     should "have the successful summary" do

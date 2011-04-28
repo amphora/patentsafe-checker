@@ -24,6 +24,10 @@
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Verbose output
 #   -y, --year          Only scan year given
+#   -d, --docfile       Filename to output list of documents
+#   -s, --sigfile       Filename to output list of signatures
+#   -c, --csv           Output docfile/sigfile in csv format [Default]
+#   -j, --json          Output docfile/sigfile in json format
 #   -x, --exceptions    Path to file with a list of known exceptions
 #                       these files are skipped during validation
 #
@@ -55,15 +59,16 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # libraries required for the script to function
-require 'optparse' 
-require 'rdoc/usage'
-require 'ostruct'
-require 'date'
-require 'rexml/document' 
 require 'base64'
+require 'date'
 require 'digest'
-require 'openssl'
 require 'logger'
+require 'optparse'
+require 'openssl'
+require 'ostruct'
+require 'pathname'
+require 'rdoc/usage'
+require 'rexml/document' 
 require 'yaml'
 
 # setup the logger if this is the main file
@@ -122,21 +127,27 @@ class App
     def parsed_options?
       # specify options
       opts = OptionParser.new 
-      opts.on('-v', '--version')      { output_version ; exit 0 }
-      opts.on('-h', '--help')         { output_help }
-      opts.on('-V', '--verbose')      { @options.verbose = true }  
-      opts.on('-q', '--quiet')        { @options.quiet = true }
-      opts.on('-y', '--year [yyyy]')  { |yyyy| @options.year = yyyy }
-      opts.on('-x', '--exceptions [expath]')   { |expath| @options.exceptions_path = expath }
+      opts.on('-v', '--version')             { output_version ; exit 0 }
+      opts.on('-h', '--help')                { output_help }
+      opts.on('-V', '--verbose')             { @options.verbose = true }  
+      opts.on('-q', '--quiet')               { @options.quiet = true }
+      opts.on('-y', '--year [yyyy]')         { |yyyy| @options.year = yyyy }
+      opts.on('-d', '--docfile [docfilename]')  { |docfilename| @options.docfile = docfilename }
+      opts.on('-s', '--sigfile [sigfilename]')  { |sigfilename| @options.sigfile = sigfilename }
+      opts.on('-c', '--csv')                 { @options.format = 'csv' }
+      opts.on('-j', '--json')                { @options.format = 'json' }
+      opts.on('-x', '--exceptions [expath]') { |expath| @options.exceptions_path = expath }
+      
       opts.parse!(@arguments) rescue return false
       process_options
-      true      
+      true
     end
 
     # Performs post-parse processing on options
     def process_options
       @options.verbose = false if @options.quiet
-
+      @options.format ||= 'csv'
+      
       if @options.exceptions_path
         # check if file passed in on -x is there
         unless File.exist?(@options.exceptions_path)
@@ -197,9 +208,12 @@ class App
       LOG.info version_text
       LOG.info "-----------------------------------------------------------------------"
       repo = Repository.new(:base_path => @patentsafe_dir, 
-                            :year => @options.year, 
+                            :year => @options.year,
                             :known_exceptions => @known_exceptions,
-                            :verbose => @options.verbose)
+                            :verbose => @options.verbose,
+                            :docfile => @options.docfile,
+                            :sigfile => @options.sigfile,
+                            :format => @options.format)
       repo.check
     end
     
@@ -219,10 +233,24 @@ class Repository
     @year = options[:year]
     @known_exceptions = options[:known_exceptions] || {}
     @verbose = options[:verbose] || false
+    @docfile = options[:docfile]
+    @sigfile = options[:sigfile]
+    @format = options[:format]
     @users = Hash.new
+    @docs = Array.new
+    @sigs = Array.new
     # results storage
     @results                          = OpenStruct.new
     @results.errors                   = Hash.new
+    # document info
+    @results.corrupt_documents        = 0
+    @results.invalid_document_hashes  = 0
+    @results.nohash_documents         = 0
+    @results.skipped_documents        = 0
+    @results.checked_documents        = 0
+    @results.known_documents_skipped  = 0
+    @results.missing_signatures       = 0
+    # signature info
     @results.corrupt_signatures       = 0
     @results.missing_keys             = 0
     @results.invalid_signature_texts  = 0
@@ -230,7 +258,7 @@ class Repository
     @results.invalid_signatures       = 0
     @results.skipped_signatures       = 0
     @results.checked_signatures       = 0
-    @results.known_files_skipped      = 0
+    @results.known_signatures_skipped = 0
   end
 
   def openssl_sha512?
@@ -248,6 +276,11 @@ class Repository
     "#{data_path}"/'users'
   end
 
+  # path to check
+  def check_path
+    path = @year ? "#{data_path.to_pattern}/#{@year}" : "#{data_path.to_pattern}"
+  end
+  
   # Performs the checks on the repository
   def check
     @check_started_at = DateTime.now
@@ -268,11 +301,13 @@ class Repository
     end
     
     load_users
+    validate_documents
     validate_signatures
     
     @check_finished_at = DateTime.now    
     LOG.info "\nPatentSafe Check Finished at #{@check_finished_at}"
     
+    generate_output_files
     generate_summary_report
   end
   
@@ -291,14 +326,64 @@ class Repository
     LOG.info "** #{@users.length} users loaded"
   end
   
+  # Loads and validates documents from the xml in the repo
+  def validate_documents
+    LOG.info ""
+    LOG.info "** validating documents"
+    
+    Dir["#{check_path}/**/docinfo.xml"].each do |path|
+      begin
+        # load the document
+        document = Document.new(:path => path, 
+                                 :sha512 => openssl_sha512?, 
+                                 :verbose => @verbose)
+      rescue REXML::ParseException => e
+        @results.corrupt_documents += 1
+        @results.checked_documents +=1
+        # move on to the next document
+        next
+      end
+        
+      # check if this is a known exception
+      if exception_comment = @known_exceptions[document.document_id]
+        LOG.info ""
+        LOG.info " * skipping #{document.document_id} at #{document.path}"
+        
+        # skip this file
+        @results.known_documents_skipped += 1
+        
+        LOG.info "  - SKIPPED: Known exception [#{exception_comment}]" if exception_comment
+      else
+        # perform validation
+        doc_errors = document.validate
+        
+        # did the doc have a hash?
+        @results.nohash_documents += 1 unless document.hash_exists?
+        
+        @results.checked_documents += 1
+        # add the doc to the array if needed
+        @docs <<  document.to_row if @docfile
+        
+        # tally errors here to save time
+        unless doc_errors.empty?
+          @results.errors[document.document_id] = doc_errors
+          @results.invalid_document_hashes  += 1 if doc_errors[:invalid_document_hash]
+          @results.skipped_documents        += 1 if doc_errors[:skipped_document]
+          @results.missing_signatures       += doc_errors[:signature_missing].length if doc_errors[:signature_missing]
+        end
+      end
+    end
+    
+    LOG.info ""
+    LOG.info "** documents validated"
+  end
+  
   # Loads and validates signatures from the xml in the repo
   def validate_signatures
     LOG.info ""
     LOG.info "** validating signatures"
     
-    path = @year ? "#{data_path.to_pattern}/#{@year}" : "#{data_path.to_pattern}"
-    
-    Dir["#{path}/**/signature-*.xml"].each do |path|
+    Dir["#{check_path}/**/signature-*.xml"].each do |path|
       begin
         # load the signature
         signature = Signature.new(:path => path, 
@@ -317,7 +402,7 @@ class Repository
         LOG.info " * skipping #{signature.signature_id} at #{signature.path}"
         
         # skip this file
-        @results.known_files_skipped += 1
+        @results.known_signatures_skipped += 1
         
         LOG.info "  - SKIPPED: Known exception [#{exception_comment}]" if exception_comment
       else
@@ -333,6 +418,8 @@ class Repository
         end
         
         @results.checked_signatures += 1
+        # add the sig to the array if needed
+        @sigs <<  signature.to_row if @sigfile
         
         # tally errors here to save time
         unless sig_errors.empty?
@@ -351,23 +438,42 @@ class Repository
   end
   
   private 
-  
+    
+    def generate_output_files
+      # overwrite old file
+      
+      # sigfile
+      File.open(@sigfile, "w+") do |f|
+        f.puts Formatter.format(@format.to_s.downcase.to_sym, Signature.columns, @sigs)
+      end if @sigfile
+
+      # docfile
+    end
+    
     # Format all the results for the summary report
     def generate_summary_report
-      total = @results.checked_signatures
+      dtotal = @results.checked_documents
+      stotal = @results.checked_signatures
       LOG.warn ""
       LOG.warn "-----------------------------------------------------------------------"
       LOG.warn "PatentSafe Checker Summary Report for #{@path}"
       LOG.warn "-----------------------------------------------------------------------"
       LOG.warn "Run at:                     #{@check_started_at}"
       LOG.warn ""
-      LOG.warn "Signatures packets checked: #{total}"
+      LOG.warn "Document packets checked:   #{dtotal}"
+      LOG.warn "Signature packets checked:  #{stotal}#{'*' unless openssl_sha512?}"
       unless @known_exceptions.empty?
-        LOG.warn "Signatures packets skipped: #{@results.known_files_skipped} (Known exceptions)"
+        LOG.warn ""
+        LOG.warn "Known Exceptions:"
+        LOG.warn "Document packets skipped:  #{@results.known_documents_skipped}"
+        LOG.warn "Signature packets skipped: #{@results.known_signatures_skipped}"
       end
       LOG.warn ""
       unless @results.errors.empty?
-        LOG.warn "-- Errors --" 
+        LOG.warn "-- Errors --"
+        LOG.warn " Corrupt documents:         #{@results.corrupt_documents}" if @results.corrupt_documents > 0
+        LOG.warn " Invalid document hashes:   #{@results.invalid_document_hashes}" if @results.invalid_document_hashes > 0
+        LOG.warn " Skipped documents:         #{@results.skipped_documents}" if @results.skipped_documents > 0
         LOG.warn " Corrupt signatures:        #{@results.corrupt_signatures}" if @results.corrupt_signatures > 0
         LOG.warn " Missing public key:        #{@results.missing_keys}" if @results.missing_keys > 0
         LOG.warn " Invalid signature texts:   #{@results.invalid_signature_texts}" if @results.invalid_signature_texts > 0
@@ -377,15 +483,16 @@ class Repository
         LOG.warn ""
       end
       LOG.warn "-- Successful checks --"
-      LOG.warn " Public keys found:         #{total - @results.missing_keys}"
-      LOG.warn " Signature texts:           #{total - @results.invalid_signature_texts}"
-      LOG.warn " Content hashes:            #{total - @results.invalid_content_hashes}"
-      LOG.warn " Valid signatures:          #{total - @results.invalid_signatures}" if openssl_sha512?
-      LOG.warn " Validated signatures*:     #{total - @results.skipped_signatures}"
+      LOG.warn " Documents w/o hash:        #{@results.nohash_documents}" if @results.nohash_documents > 0
+      LOG.warn " Document hashes:           #{dtotal - @results.invalid_document_hashes - @results.nohash_documents}" if openssl_sha512?
+      LOG.warn " Public keys found:         #{stotal - @results.missing_keys}"
+      LOG.warn " Signature texts:           #{stotal - @results.invalid_signature_texts}"
+      LOG.warn " Content hashes:            #{stotal - @results.invalid_content_hashes}" if openssl_sha512?
+      LOG.warn " Valid signatures:          #{stotal - @results.invalid_signatures}" if openssl_sha512?
       LOG.warn ""
-      LOG.fatal "  * Signatures could not be validated as the installed " unless openssl_sha512?
+      LOG.fatal "  * Hashes and public_keys could not be validated as the installed " unless openssl_sha512?
       LOG.fatal "    version of OpenSSL does not support SHA512." unless openssl_sha512?
-      LOG.warn "-----------------------------------------------------------------------"            
+      LOG.warn "-----------------------------------------------------------------------"
       LOG.warn ""
     end
 end
@@ -393,13 +500,14 @@ end
 
 # User is a wrapper around the user xml document
 class User
-  attr_accessor :verbose
+  attr_accessor :verbose, :path, :xml
   attr_reader :version, :user_id, :name, :keys
   
   def initialize(options={})
     # path, verbose=false
     @path = options[:path]
     @verbose = options[:verbose] || false
+    
     @keys = Array.new
     
     if @path
@@ -427,56 +535,188 @@ class User
 end
 
 
-# Signature is a wrapper around the signature xml document
-class Signature
-  attr_accessor :verbose
-  # signer attributes
-  attr_reader :signer_id, :signer_name, :public_key, :role
-  # signature attributes
-  attr_reader :path, :signature_id, :document_id, :content_filename, :content_hash, :wording, :date, :text, :value
+# Document is a wrapper around the document xml document
+class Document
+  attr_accessor :verbose, :path, :xml
+  # document attributes
+  attr_reader :document_id, :document_type, :content_name, :hash, :signature_ids, :signature_paths
   
   def initialize(options={})
     # path, sha512=false, verbose=false
     @path = options[:path]
-    @sha512 = options[:sha512] || false
     @verbose = options[:verbose] || false
-    @errors = Hash.new    
+    
+    @sha512 = options[:sha512] || false
+    @errors = Hash.new
     if @path
       @xml = REXML::Document.new(File.open(path))
-      @signature_id = @xml.root.attribute("sigId").to_s
+      root = @xml.root
+      @document_id = root.attribute("docId").to_s
+      @document_type = root.attribute("type").to_s
+      cn = root.elements["content/name"]
+      @content_name = cn ? cn.text : "UNKNOWN"
+      h = root.elements["hash[@format='sha512']"]
+      if h
+        @hash_exists = true
+        @hash = h.text.to_s
+      else
+        @hash_exists = false
+        @hash = nil
+      end
+      # signature_ids is an array of ids for signatures that have a state of "Signed"
+      @signature_ids = []
+      root.get_elements("signatures/signature").each{ |s| @signature_ids << s.attribute("sigId").to_s if s.get_text("state").value().to_s.downcase == "signed" }
+      
+      pn = Pathname.new(path)
+      # trim signature id to get the file suffix: TEST0100000037S001 (last 3 digits)
+      @signature_paths = @signature_ids.map{ |sid| File.join(pn.dirname,"signature-#{sid[15..17]}.xml") }
+    end
+    
+  end
+  
+  def self.columns
+    ["Document ID", "Hash"]
+  end
+  
+  def to_row
+    [document_id, hash]
+  end
+
+  def content_path
+    File.dirname(path).to_s/content_name
+  end
+  
+  def content_txt_path
+    File.dirname(path).to_s/"content.txt"
+  end
+  
+  def sha512?
+    @sha512
+  end
+  
+  def hash_exists?
+    @hash_exists
+  end
+  
+  def generated_hash
+    @generated_hash ||= Digest::SHA512.hexdigest(File.open(content_path, "rb").read)
+  end
+  
+  def hash_valid?
+    @hash_valid ||= (generated_hash == hash)
+  end
+  
+  def has_signatures?
+    signature_ids.length > 0
+  end
+    
+  # returns hash of errors
+  def validate
+    LOG.info ""
+    LOG.info " * validating #{document_id} at #{path}"
+    
+    if hash_exists?
+      if hash_valid?
+        LOG.info "  - OK:  Generated document hash is consistent with #{content_name}"
+      else
+        if sha512?
+          LOG.error "  - ERROR: #{document_id unless verbose} Generated document hash is inconsistent with #{content_name}"
+          @errors[:invalid_document_hash] = [generated_hash, hash]
+        else
+          LOG.info "  - SKIPPED:  Document hash cannot be validated without OpenSSL SHA512 support"
+          @errors[:skipped_document] = true
+        end
+      end # hash_valid?
+    else
+      # If a document doesn't have a hash then it can still be valid!
+      # LOG.info "  - SKIPPED:  Document type '#{document_type}' has no hash"
+      # @errors[:skipped_document] = true
+    end # check_hash?
+
+    # test if signature files are on disk
+    signature_paths.inject(false) do |exists, path|
+      exists = File.exists?(path)
+      if exists
+        LOG.info "  - OK:  Document signature found at #{path}"
+      else
+        LOG.error "  - ERROR: Document signature expected at #{path}"
+        @errors[:signature_missing] ||= []
+        @errors[:signature_missing] << path
+      end
+    end if has_signatures?
+    
+    @errors
+  end
+  
+  # same checks as validate but without messages
+  def valid?
+    # hash consistent?
+    (hash_valid? if check_hash?)
+  end
+end
+
+
+# Signature is a wrapper around the signature xml document
+class Signature
+  attr_accessor :verbose, :path, :xml
+  # signer attributes
+  attr_reader :signer_id, :signer_name, :public_key, :role
+  # signature attributes
+  attr_reader :signature_id, :document_id, :content_filename, :content_hash, :wording, :date, :text, :value
+  
+  def initialize(options={})
+    # path, sha512=false, verbose=false
+    @path = options[:path]
+    @verbose = options[:verbose] || false
+
+    @sha512 = options[:sha512] || false
+    @errors = Hash.new
+    if @path
+      @xml = REXML::Document.new(File.open(path))
+      root = @xml.root
+      @signature_id = root.attribute("sigId").to_s
       @document_id = @signature_id[0..13] # first 13 characters
-      @signer_id = @xml.root.elements["signer"].attribute("userId").value()
-      @signer_name = @xml.root.get_text("signer").value()
-      @public_key = @xml.root.get_text("publicKey").value().to_s.strip
-      @role = @xml.root.get_text("role").value()
-      @content_filename = @xml.root.elements["signedContent"].attribute("filename").value()
-      @content_hash = @xml.root.get_text("signedContent").value().to_s.strip
-      @wording = @xml.root.get_text("affirmedWording").value()
-      @date = @xml.root.get_text("signatureDate").value()
-      @text = @xml.root.get_text("signatureText").value()
-      @value= @xml.root.get_text("signatureValue").value()
+      @signer_id = root.elements["signer"].attribute("userId").value()
+      @signer_name = root.get_text("signer").value()
+      @public_key = root.get_text("publicKey").value().to_s.strip
+      @role = root.get_text("role").value()
+      @content_filename = root.elements["signedContent"].attribute("filename").value()
+      @content_hash = root.get_text("signedContent").value().to_s.strip
+      @wording = root.get_text("affirmedWording").value()
+      @date = root.get_text("signatureDate").value()
+      @text = root.get_text("signatureText").value()
+      @value= root.get_text("signatureValue").value()
     end
   end
   
+  def self.columns
+    ["Signature ID", "Value"]
+  end
+  
+  def to_row
+    [signature_id, value]
+  end
+  
   def signed_content_path
-    File.dirname(@path).to_s/@content_filename
+    File.dirname(path).to_s/content_filename
   end
   
   # Internally generated for comparison
   def generated_signature_text
-    "~~#{@signer_id}~~#{@wording}~~#{@date}~~#{@content_hash}~~"
+    "~~#{signer_id}~~#{wording}~~#{date}~~#{content_hash}~~"
   end
   
   def signature_text_valid?
-    generated_signature_text == @text
+    generated_signature_text == text
+  end
+  
+  def sha512?
+    @sha512
   end
   
   # Internally generated for comparison
   def generated_content_hash
-    # use the stored value if we have it
     @generated_content_hash ||= Digest::SHA512.hexdigest(File.open(signed_content_path, "rb").read)
-  # rescue
-  #   nil
   end
   
   def content_hash_valid?
@@ -484,15 +724,15 @@ class Signature
   end
   
   def generated_public_key
-    @generated_public_key ||= OpenSSL::PKey::RSA.new(Base64.decode64(@public_key))
+    @generated_public_key ||= OpenSSL::PKey::RSA.new(Base64.decode64(public_key))
   # on Windows the key isn't loaded, we get a hard error
   rescue OpenSSL::PKey::RSAError => e
     false    
   end
 
   def public_key_valid?
-    if @sha512 && generated_public_key
-      @public_key_valid ||= (generated_public_key.verify(OpenSSL::Digest::SHA512.new, Base64.decode64(@value), @text))
+    if sha512? && generated_public_key
+      @public_key_valid ||= (generated_public_key.verify(OpenSSL::Digest::SHA512.new, Base64.decode64(value), text))
     else
       false
     end
@@ -502,28 +742,28 @@ class Signature
   # returns hash of errors
   def validate
     LOG.info ""
-    LOG.info " * validating #{@signature_id} at #{@path}"
+    LOG.info " * validating #{signature_id} at #{path}"
     
     if signature_text_valid?
       LOG.info "  - OK:  Generated signature text is consistent with signature packet"
     else
-      LOG.error "  - ERROR: #{@signature_id unless @verbose} Generated signature text is inconsistent with signature packet"
-      @errors[:invalid_signature_text] = [@generated_signature_text, @text] 
+      LOG.error "  - ERROR: #{signature_id unless verbose} Generated signature text is inconsistent with signature packet"
+      @errors[:invalid_signature_text] = [generated_signature_text, text] 
     end
     
     if content_hash_valid?
       LOG.info "  - OK:  Generated document hash is consistent with signature packet"
     else
-      LOG.error "  - ERROR: #{@signature_id unless @verbose} Generated document hash is inconsistent with signature packet"
-      @errors[:invalid_content_hash] = [@generated_content_hash, @content_hash]
+      LOG.error "  - ERROR: #{signature_id unless verbose} Generated document hash is inconsistent with signature packet"
+      @errors[:invalid_content_hash] = [generated_content_hash, content_hash]
     end
     
     if public_key_valid?
       LOG.info "  - OK:  Signature is valid"
     else
-      if @sha512
-        LOG.error "  - ERROR: #{@signature_id unless @verbose} Signature is invalid [#{@signature_id}]"
-        @errors[:invalid_signature] = [@generated_public_key, @value]
+      if sha512?
+        LOG.error "  - ERROR: #{signature_id unless verbose} Signature is invalid [#{signature_id}]"
+        @errors[:invalid_signature] = [generated_public_key, value]
       else
         LOG.info "  - SKIPPED:  Signature cannot be validated without OpenSSL SHA512 support"
         @errors[:skipped_signature] = true
@@ -545,6 +785,81 @@ class Signature
     public_key_valid?
   end
   
+end
+
+
+# Default/base output Formatter
+class Formatter
+  def self.format(fmt, columns, rows)
+    self.new(fmt).format(columns, rows)
+  end
+  
+  def initialize(format = :csv)
+    @format = format
+    mod = "#{format.to_s.capitalize}Formatter"
+    # include the formatter we need to use
+    # include Class.const_get()
+    self.class.instance_eval("include #{mod}")
+  end
+    
+  def format(columns, rows)
+    @columns = columns
+    @col_count = columns.length
+    @rows = rows
+    @row_count = rows.length
+    
+    "".tap do |out|
+      out << header
+      rows.each_with_index do |r, i|
+        out << row(r, i)
+      end
+      out << footer
+    end
+  end
+  
+  def quote(val)
+    %Q|"#{val}"|
+  end
+end
+
+
+# Format a 'row' in csv format
+module CsvFormatter
+  def header
+    @columns.map{|v| quote(v)}.join(",") + "\n"
+  end
+  
+  def row(r, ri)
+    r.map{|v| quote(v)}.join(",") + "\n"
+  end
+  
+  def footer
+    ""
+  end
+end
+
+
+# Format a 'row' in json format - makes the object look like a hash
+module JsonFormatter
+  def header
+    "[\n"
+  end
+  
+  def row(r, ri)
+    "".tap do |out|
+      out << "  {"
+      @columns.each_with_index do |col, i|
+         out << "#{quote(col)}:#{quote(r[i])}"
+         out << (i == @col_count-1 ? "" : ",")
+      end
+      out << "}"
+      out << (ri == @row_count-1 ? "\n" : ",\n")
+    end
+  end
+  
+  def footer
+    "]\n"
+  end
 end
 
 
@@ -573,6 +888,7 @@ class String
   end  
   
 end
+
 
 # Only run the app if this was called from the command line rather than included as a library
 if __FILE__ == $PROGRAM_NAME
