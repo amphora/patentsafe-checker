@@ -1,6 +1,6 @@
 require  File.dirname(__FILE__)+'/test_helper'
 
-class TestPSCheckCsvOut < Test::Unit::TestCase
+class TestPSCheckJsonOut < Test::Unit::TestCase
   # code to get us startup before all tests
   class << self
     
@@ -8,11 +8,11 @@ class TestPSCheckCsvOut < Test::Unit::TestCase
     def startup
       # c = csv
       # f = output filename
-      @@docfile = "#{tmp_dir}/pscheck-docout.csv"
-      @@docoutput = `ruby pscheck.rb -V -c -d #{@@docfile} #{@@dir}`
+      @@docfile = "#{tmp_dir}/pscheck-docout.json"
+      @@docoutput = `ruby pscheck.rb -V -j -d #{@@docfile} #{@@dir}`
       
-      @@sigfile = "#{tmp_dir}/pscheck-sigout.csv"
-      @@sigoutput = `ruby pscheck.rb -V -c -s #{@@sigfile} #{@@dir}`
+      @@sigfile = "#{tmp_dir}/pscheck-sigout.json"
+      @@sigoutput = `ruby pscheck.rb -V -j -s #{@@sigfile} #{@@dir}`
     end
     
     # runs after all tests
@@ -21,9 +21,9 @@ class TestPSCheckCsvOut < Test::Unit::TestCase
     def suite
       mysuite = super
       def mysuite.run(*args)
-        TestPSCheckCsvOut.startup()
+        TestPSCheckJsonOut.startup()
         super
-        TestPSCheckCsvOut.shutdown()
+        TestPSCheckJsonOut.shutdown()
       end
       mysuite
     end
@@ -36,8 +36,8 @@ class TestPSCheckCsvOut < Test::Unit::TestCase
       @output = `ruby pscheck.rb -h`
     end
     
-    should "have the -c option" do
-      assert_match /-c/, @output
+    should "have the -j option" do
+      assert_match /-j/, @output
     end
     
     should "have the -d option" do
@@ -49,15 +49,16 @@ class TestPSCheckCsvOut < Test::Unit::TestCase
     end
   end
   
-  context "pscheck with output format as csv" do
+  context "pscheck with output format as json" do
     
     should "output a file" do
       assert File.exist?(@@sigfile)
     end
 
-    should "have csv output in the file" do
+    should "have json output in the file" do
       csv = File.open(@@sigfile).read
-      assert_match /"Signature ID","Value"/, csv
+      assert_match /"Signature ID":"TEST0100000002S001"/, csv
+      assert_match /"Value":"ZlaLs3/, csv
     end
   end
   
