@@ -52,10 +52,15 @@ class TestPSCheckJsonOut < Test::Unit::TestCase
   context "pscheck with output format as json" do
     
     should "output a file" do
+      assert File.exist?(@@docfile)
       assert File.exist?(@@sigfile)
     end
 
     should "have json output in the file" do
+      json = File.open(@@docfile).read
+      assert_match /"Document ID":"TEST0100000002"/, json
+      assert_match /"Hash":"6ef1f5283a4a7e9772/, json
+      
       json = File.open(@@sigfile).read
       assert_match /"Signature ID":"TEST0100000002S001"/, json
       assert_match /"Value":"ZlaLs3/, json

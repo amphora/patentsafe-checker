@@ -52,10 +52,14 @@ class TestPSCheckCsvOut < Test::Unit::TestCase
   context "pscheck with output format as csv" do
     
     should "output a file" do
+      assert File.exist?(@@docfile)
       assert File.exist?(@@sigfile)
     end
 
     should "have csv output in the file" do
+      csv = File.open(@@docfile).read
+      assert_match /"Document ID","Hash"/, csv
+      
       csv = File.open(@@sigfile).read
       assert_match /"Signature ID","Value"/, csv
     end

@@ -440,14 +440,15 @@ class Repository
   private 
     
     def generate_output_files
-      # overwrite old file
-      
-      # sigfile
-      File.open(@sigfile, "w+") do |f|
-        f.puts Formatter.format(@format.to_s.downcase.to_sym, Signature.columns, @sigs)
-      end if @sigfile
-
-      # docfile
+      # overwrite old files
+      write_formatted_file(@docfile, @format, Document.columns, @docs) if @docfile
+      write_formatted_file(@sigfile, @format, Signature.columns, @sigs) if @sigfile
+    end
+    
+    def write_formatted_file(path, format, columns, data)
+      File.open(path, "w+") do |f|
+        f.puts Formatter.format(format.to_s.downcase.to_sym, columns, data)
+      end
     end
     
     # Format all the results for the summary report
