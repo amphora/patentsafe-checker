@@ -1,11 +1,11 @@
-#!/usr/bin/env ruby 
+#!/usr/bin/env ruby
 #
-# == Synopsis 
+# == Synopsis
 #   Script to scan the PatentSafe document repository checking for
 #   document and signature validity.
 #
 # == Examples
-#   
+#
 #     ruby pscheck.rb
 #
 #   Other examples:
@@ -13,7 +13,7 @@
 #     ruby pscheck.rb --verbose /path/to/repository
 #     ruby pscheck.rb -y 2007 -v /path/to/repository
 #
-# == Usage 
+# == Usage
 #   pscheck.rb [options] path_to_repository
 #
 #   For help use: ruby pscheck.rb -h
@@ -31,7 +31,7 @@
 #   -x, --exceptions    Path to file with a list of known exceptions
 #                       these files are skipped during validation
 #
-#   Known exception file format - each file listed on a new line with 
+#   Known exception file format - each file listed on a new line with
 #   a space after the :
 #
 #   DOCID: Explanation/comment/note
@@ -49,12 +49,12 @@
 #   it under the terms of the GNU General Public License as published by
 #   the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
-# 
+#
 #   This program is distributed in the hope that it will be useful,
 #   but WITHOUT ANY WARRANTY; without even the implied warranty of
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
-# 
+#
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -68,23 +68,23 @@ require 'openssl'
 require 'ostruct'
 require 'pathname'
 require 'rdoc/usage'
-require 'rexml/document' 
+require 'rexml/document'
 require 'yaml'
 
 # setup the logger if this is the main file
 if __FILE__ == $PROGRAM_NAME
-	LOG = Logger.new(STDOUT)
+  LOG = Logger.new(STDOUT)
 end
 
 
-# App is a wrapper around the operations needed to process PatentSafe 
-# repository files. It handles options parsing, control flow for the 
-# script and help output. 
+# App is a wrapper around the operations needed to process PatentSafe
+# repository files. It handles options parsing, control flow for the
+# script and help output.
 #
 # To see what is really happening - jump to the process_command method
 #
 class App
-  VERSION = '5.0-dev'
+  VERSION = '5.1'
 
   attr_reader :options
 
@@ -102,8 +102,8 @@ class App
   def run
     # install custom formatter
     LOG.formatter = LogFormat.new
-        
-    if parsed_options? && arguments_valid? 
+
+    if parsed_options? && arguments_valid?
       # set log level
       if @options.verbose
         LOG.level = Logger::INFO
@@ -119,17 +119,17 @@ class App
     else
       output_usage
     end
-      
+
   end
-  
+
   protected
-  
+
     def parsed_options?
       # specify options
-      opts = OptionParser.new 
+      opts = OptionParser.new
       opts.on('-v', '--version')             { output_version ; exit 0 }
       opts.on('-h', '--help')                { output_help }
-      opts.on('-V', '--verbose')             { @options.verbose = true }  
+      opts.on('-V', '--verbose')             { @options.verbose = true }
       opts.on('-q', '--quiet')               { @options.quiet = true }
       opts.on('-y', '--year [yyyy]')         { |yyyy| @options.year = yyyy }
       opts.on('-d', '--docfile [docfilename]')  { |docfilename| @options.docfile = docfilename }
@@ -137,7 +137,7 @@ class App
       opts.on('-c', '--csv')                 { @options.format = 'csv' }
       opts.on('-j', '--json')                { @options.format = 'json' }
       opts.on('-x', '--exceptions [expath]') { |expath| @options.exceptions_path = expath }
-      
+
       opts.parse!(@arguments) rescue return false
       process_options
       true
@@ -147,67 +147,67 @@ class App
     def process_options
       @options.verbose = false if @options.quiet
       @options.format ||= 'csv'
-      
+
       if @options.exceptions_path
         # check if file passed in on -x is there
         unless File.exist?(@options.exceptions_path)
           LOG.fatal "Exception list cannot be found at '#{@options.exceptions_path}'. Check the path and try again."
           exit
         end
-        
+
         # can the file be loaded?
         begin
           @known_exceptions = YAML.load_file(@options.exceptions_path)
-        rescue 
+        rescue
           LOG.fatal "Exception list at '#{@options.exceptions_path}' could not be loaded. Please check the file format."
           exit
         end
       end
-      
+
     end
-    
+
     def output_options
       puts "Options:\n"
-      
-      @options.marshal_dump.each do |name, val|        
+
+      @options.marshal_dump.each do |name, val|
         puts "  #{name} = #{val}"
       end
     end
 
     # True if required arguments were provided
     def arguments_valid?
-      true if @arguments.length == 1 
+      true if @arguments.length == 1
     end
-    
+
     # Setup the arguments
     def process_arguments
       @patentsafe_dir = ARGV[0] if ARGV[0]
     end
-    
+
     def output_help
       puts version_text
       RDoc::usage() #exits app
     end
-    
+
     def output_usage
       RDoc::usage('usage') # gets usage from comments above
     end
-    
+
     def output_version
       puts version_text
       puts RDoc::usage('copyright')
     end
-    
+
     def version_text
       "#{File.basename(__FILE__)} version #{VERSION}"
     end
-    
+
     # The guts of pscheck
     def process_command
       LOG.info ""
       LOG.info version_text
       LOG.info "-----------------------------------------------------------------------"
-      repo = Repository.new(:base_path => @patentsafe_dir, 
+      repo = Repository.new(:base_path => @patentsafe_dir,
                             :year => @options.year,
                             :known_exceptions => @known_exceptions,
                             :verbose => @options.verbose,
@@ -216,17 +216,17 @@ class App
                             :format => @options.format)
       repo.check
     end
-    
+
 end
 
 
 # Repository is a wrapper around the functions specific to the repo.
-# It handles path formatting, loading users, loading signatures 
+# It handles path formatting, loading users, loading signatures
 class Repository
   attr_accessor :verbose
   attr_accessor :path
   attr_reader :results
-  
+
   def initialize(options={})
     # base_path, year=nil, verbose=false
     @path = options[:base_path]
@@ -262,16 +262,16 @@ class Repository
   end
 
   def openssl_sha512?
-    @openssl_sha512 ||= OpenSSL::Digest::SHA512.hexdigest('TEST') == 
+    @openssl_sha512 ||= OpenSSL::Digest::SHA512.hexdigest('TEST') ==
       "7bfa95a688924c47c7d22381f20cc926f524beacb13f84e203d4bd8cb6ba2fce81c57a5f059bf3d509926487bde925b3bcee0635e4f7baeba054e5dba696b2bf"
   rescue
     nil
   end
-  
+
   def data_path
     "#{@path}"/'data'
   end
-  
+
   def users_path
     "#{data_path}"/'users'
   end
@@ -280,16 +280,16 @@ class Repository
   def check_path
     path = @year ? "#{data_path.to_pattern}/#{@year}" : "#{data_path.to_pattern}"
   end
-  
+
   # Performs the checks on the repository
   def check
     @check_started_at = DateTime.now
     LOG.info "PatentSafe Check Start at #{@check_started_at}\n"
-    
+
     unless openssl_sha512?
       LOG.fatal "!! OpenSSL Digest does not support SHA512 - signatures can not be validated. !!\n"
     end
-    
+
     unless @known_exceptions.empty?
       LOG.info "** known file exceptions list loaded (all signatures for these documents will be skipped)"
       @known_exceptions.each do |docid,comment|
@@ -297,45 +297,45 @@ class Repository
       end
       LOG.info ""
       LOG.info "** #{@known_exceptions.length} known file exceptions loaded"
-      LOG.info ""      
+      LOG.info ""
     end
-    
+
     load_users
     validate_documents
     validate_signatures
-    
-    @check_finished_at = DateTime.now    
+
+    @check_finished_at = DateTime.now
     LOG.info "\nPatentSafe Check Finished at #{@check_finished_at}"
-    
+
     generate_output_files
     generate_summary_report
   end
-  
+
   # Loads users from the xml in the repo
   def load_users
     LOG.info "** loading users from #{users_path}"
-    
+
     Dir["#{users_path.to_pattern}/**/*.xml"].each do |path|
       user = User.new(:path => path,
                       :verbose => @verbose)
       # store it for use later
       @users[user.user_id] = user
     end
-    
+
     LOG.info ""
     LOG.info "** #{@users.length} users loaded"
   end
-  
+
   # Loads and validates documents from the xml in the repo
   def validate_documents
     LOG.info ""
     LOG.info "** validating documents"
-    
+
     Dir["#{check_path}/**/docinfo.xml"].each do |path|
       begin
         # load the document
-        document = Document.new(:path => path, 
-                                 :sha512 => openssl_sha512?, 
+        document = Document.new(:path => path,
+                                 :sha512 => openssl_sha512?,
                                  :verbose => @verbose)
       rescue REXML::ParseException => e
         @results.corrupt_documents += 1
@@ -343,27 +343,27 @@ class Repository
         # move on to the next document
         next
       end
-        
+
       # check if this is a known exception
       if exception_comment = @known_exceptions[document.document_id]
         LOG.info ""
         LOG.info " * skipping #{document.document_id} at #{document.path}"
-        
+
         # skip this file
         @results.known_documents_skipped += 1
-        
+
         LOG.info "  - SKIPPED: Known exception [#{exception_comment}]" if exception_comment
       else
         # perform validation
         doc_errors = document.validate
-        
+
         # did the doc have a hash?
         @results.nohash_documents += 1 unless document.hash_exists?
-        
+
         @results.checked_documents += 1
         # add the doc to the array if needed
         @docs <<  document.to_row if @docfile
-        
+
         # tally errors here to save time
         unless doc_errors.empty?
           @results.errors[document.document_id] = doc_errors
@@ -373,21 +373,21 @@ class Repository
         end
       end
     end
-    
+
     LOG.info ""
     LOG.info "** documents validated"
   end
-  
+
   # Loads and validates signatures from the xml in the repo
   def validate_signatures
     LOG.info ""
     LOG.info "** validating signatures"
-    
+
     Dir["#{check_path}/**/signature-*.xml"].each do |path|
       begin
         # load the signature
-        signature = Signature.new(:path => path, 
-                                  :sha512 => openssl_sha512?, 
+        signature = Signature.new(:path => path,
+                                  :sha512 => openssl_sha512?,
                                   :verbose => @verbose)
       rescue REXML::ParseException => e
         @results.corrupt_signatures += 1
@@ -395,20 +395,20 @@ class Repository
         # move on to the next signature
         next
       end
-        
+
       # check if this is a known exception
       if exception_comment = @known_exceptions[signature.document_id]
         LOG.info ""
         LOG.info " * skipping #{signature.signature_id} at #{signature.path}"
-        
+
         # skip this file
         @results.known_signatures_skipped += 1
-        
+
         LOG.info "  - SKIPPED: Known exception [#{exception_comment}]" if exception_comment
       else
         # perform validation
         sig_errors = signature.validate
-        
+
         # check if user public key can be found
         if @users[signature.signer_id].keys.include?(signature.public_key)
           LOG.info "  - OK:  User public key is consistent with database"
@@ -416,11 +416,11 @@ class Repository
           LOG.error "  - ERROR: #{signature.signature_id unless @verbose} User public key not found (this may not be a problem - make sure you can find the identity certificate)"
           sig_errors[:missing_key] = {signature.public_key => signature.signer_id}
         end
-        
+
         @results.checked_signatures += 1
         # add the sig to the array if needed
         @sigs <<  signature.to_row if @sigfile
-        
+
         # tally errors here to save time
         unless sig_errors.empty?
           @results.errors[signature.signature_id] = sig_errors
@@ -432,25 +432,25 @@ class Repository
         end
       end
     end
-    
+
     LOG.info ""
     LOG.info "** signatures validated"
   end
-  
-  private 
-    
+
+  private
+
     def generate_output_files
       # overwrite old files
       write_formatted_file(@docfile, @format, Document.columns, @docs) if @docfile
       write_formatted_file(@sigfile, @format, Signature.columns, @sigs) if @sigfile
     end
-    
+
     def write_formatted_file(path, format, columns, data)
       File.open(path, "w+") do |f|
         f.puts Formatter.format(format.to_s.downcase.to_sym, columns, data)
       end
     end
-    
+
     # Format all the results for the summary report
     def generate_summary_report
       dtotal = @results.checked_documents
@@ -503,14 +503,14 @@ end
 class User
   attr_accessor :verbose, :path, :xml
   attr_reader :version, :user_id, :name, :keys
-  
+
   def initialize(options={})
     # path, verbose=false
     @path = options[:path]
     @verbose = options[:verbose] || false
-    
+
     @keys = Array.new
-    
+
     if @path
       @xml = REXML::Document.new(File.read(@path))
       # load the document on initialize "eagerly"
@@ -532,7 +532,7 @@ class User
       LOG.info " - loaded #{@name} [#{@user_id}] with #{@keys.length} keys"
     end
   end
-  
+
 end
 
 
@@ -541,12 +541,12 @@ class Document
   attr_accessor :verbose, :path, :xml
   # document attributes
   attr_reader :document_id, :document_type, :content_name, :hash, :signature_ids, :signature_paths
-  
+
   def initialize(options={})
     # path, sha512=false, verbose=false
     @path = options[:path]
     @verbose = options[:verbose] || false
-    
+
     @sha512 = options[:sha512] || false
     @errors = Hash.new
     if @path
@@ -567,18 +567,18 @@ class Document
       # signature_ids is an array of ids for signatures that have a state of "Signed"
       @signature_ids = []
       root.get_elements("signatures/signature").each{ |s| @signature_ids << s.attribute("sigId").to_s if s.get_text("state").value().to_s.downcase == "signed" }
-      
+
       pn = Pathname.new(path)
       # trim signature id to get the file suffix: TEST0100000037S001 (last 3 digits)
       @signature_paths = @signature_ids.map{ |sid| File.join(pn.dirname,"signature-#{sid[15..17]}.xml") }
     end
-    
+
   end
-  
+
   def self.columns
     ["Document ID", "Hash"]
   end
-  
+
   def to_row
     [document_id, hash]
   end
@@ -586,36 +586,36 @@ class Document
   def content_path
     File.dirname(path).to_s/content_name
   end
-  
+
   def content_txt_path
     File.dirname(path).to_s/"content.txt"
   end
-  
+
   def sha512?
     @sha512
   end
-  
+
   def hash_exists?
     @hash_exists
   end
-  
+
   def generated_hash
     @generated_hash ||= Digest::SHA512.hexdigest(File.open(content_path, "rb").read)
   end
-  
+
   def hash_valid?
     @hash_valid ||= (generated_hash == hash)
   end
-  
+
   def has_signatures?
     signature_ids.length > 0
   end
-    
+
   # returns hash of errors
   def validate
     LOG.info ""
     LOG.info " * validating #{document_id} at #{path}"
-    
+
     if hash_exists?
       if hash_valid?
         LOG.info "  - OK:  Generated document hash is consistent with #{content_name}"
@@ -645,10 +645,10 @@ class Document
         @errors[:signature_missing] << path
       end
     end if has_signatures?
-    
+
     @errors
   end
-  
+
   # same checks as validate but without messages
   def valid?
     # hash consistent?
@@ -664,7 +664,7 @@ class Signature
   attr_reader :signer_id, :signer_name, :public_key, :role
   # signature attributes
   attr_reader :signature_id, :document_id, :content_filename, :content_hash, :wording, :date, :text, :value
-  
+
   def initialize(options={})
     # path, sha512=false, verbose=false
     @path = options[:path]
@@ -689,46 +689,46 @@ class Signature
       @value= root.get_text("signatureValue").value()
     end
   end
-  
+
   def self.columns
     ["Signature ID", "Value"]
   end
-  
+
   def to_row
     [signature_id, value]
   end
-  
+
   def signed_content_path
     File.dirname(path).to_s/content_filename
   end
-  
+
   # Internally generated for comparison
   def generated_signature_text
     "~~#{signer_id}~~#{wording}~~#{date}~~#{content_hash}~~"
   end
-  
+
   def signature_text_valid?
     generated_signature_text == text
   end
-  
+
   def sha512?
     @sha512
   end
-  
+
   # Internally generated for comparison
   def generated_content_hash
     @generated_content_hash ||= Digest::SHA512.hexdigest(File.open(signed_content_path, "rb").read)
   end
-  
+
   def content_hash_valid?
     @content_hash_valid ||= (generated_content_hash == @content_hash)
   end
-  
+
   def generated_public_key
     @generated_public_key ||= OpenSSL::PKey::RSA.new(Base64.decode64(public_key))
   # on Windows the key isn't loaded, we get a hard error
   rescue OpenSSL::PKey::RSAError => e
-    false    
+    false
   end
 
   def public_key_valid?
@@ -738,27 +738,27 @@ class Signature
       false
     end
   end
-  
+
   # signer_db_keys< Array> of keys
   # returns hash of errors
   def validate
     LOG.info ""
     LOG.info " * validating #{signature_id} at #{path}"
-    
+
     if signature_text_valid?
       LOG.info "  - OK:  Generated signature text is consistent with signature packet"
     else
       LOG.error "  - ERROR: #{signature_id unless verbose} Generated signature text is inconsistent with signature packet"
-      @errors[:invalid_signature_text] = [generated_signature_text, text] 
+      @errors[:invalid_signature_text] = [generated_signature_text, text]
     end
-    
+
     if content_hash_valid?
       LOG.info "  - OK:  Generated document hash is consistent with signature packet"
     else
       LOG.error "  - ERROR: #{signature_id unless verbose} Generated document hash is inconsistent with signature packet"
       @errors[:invalid_content_hash] = [generated_content_hash, content_hash]
     end
-    
+
     if public_key_valid?
       LOG.info "  - OK:  Signature is valid"
     else
@@ -770,22 +770,22 @@ class Signature
         @errors[:skipped_signature] = true
       end
     end
-    
+
     @errors
   end
-  
+
   # same checks as validate but without messages
   def valid?
     # public key in file consistent with db?
     # signature text consistent?
     # hash consistent?
     # signature value consistent?
-    @signer_db_keys.include?(@public_key) && 
+    @signer_db_keys.include?(@public_key) &&
     signature_text_valid? &&
     content_hash_valid? &&
     public_key_valid?
   end
-  
+
 end
 
 
@@ -794,7 +794,7 @@ class Formatter
   def self.format(fmt, columns, rows)
     self.new(fmt).format(columns, rows)
   end
-  
+
   def initialize(format = :csv)
     @format = format
     mod = "#{format.to_s.capitalize}Formatter"
@@ -802,13 +802,13 @@ class Formatter
     # include Class.const_get()
     self.class.instance_eval("include #{mod}")
   end
-    
+
   def format(columns, rows)
     @columns = columns
     @col_count = columns.length
     @rows = rows
     @row_count = rows.length
-    
+
     "".tap do |out|
       out << header
       rows.each_with_index do |r, i|
@@ -817,7 +817,7 @@ class Formatter
       out << footer
     end
   end
-  
+
   def quote(val)
     %Q|"#{val}"|
   end
@@ -829,11 +829,11 @@ module CsvFormatter
   def header
     @columns.map{|v| quote(v)}.join(",") + "\n"
   end
-  
+
   def row(r, ri)
     r.map{|v| quote(v)}.join(",") + "\n"
   end
-  
+
   def footer
     ""
   end
@@ -845,7 +845,7 @@ module JsonFormatter
   def header
     "[\n"
   end
-  
+
   def row(r, ri)
     "".tap do |out|
       out << "  {"
@@ -857,7 +857,7 @@ module JsonFormatter
       out << (ri == @row_count-1 ? "\n" : ",\n")
     end
   end
-  
+
   def footer
     "]\n"
   end
@@ -882,12 +882,12 @@ class String
     path.gsub!(File::SEPARATOR, File::ALT_SEPARATOR || File::SEPARATOR) if RUBY_PLATFORM =~ /win32/i
     path
   end
-  
+
   # switches \\ or \ to / for dir pattern search
   def to_pattern
     RUBY_PLATFORM =~ /win32/i ? self.gsub!(/\\|\\\\/,"/") : self
-  end  
-  
+  end
+
 end
 
 
