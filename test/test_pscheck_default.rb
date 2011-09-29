@@ -1,27 +1,13 @@
 require  File.dirname(__FILE__)+'/test_helper'
 
-class TestPSCheckDefault < Test::Unit::TestCase
-  # code to get us startup before all tests
-  class << self
-    
-    # runs before all tests
-    def startup
-      @@output = `ruby pscheck.rb #{@@dir}`
-    end
-    
-    # runs after all tests
-    def shutdown; end
-    
-    def suite
-      mysuite = super
-      def mysuite.run(*args)
-        TestPSCheckDefault.startup()
-        super
-        TestPSCheckDefault.shutdown()
-      end
-      mysuite
-    end
+class TestPSCheckDefault < TestCase
+  # runs before all tests
+  def self.startup
+    @@output = `ruby pscheck.rb #{@@dir}`
   end
+
+  # runs after all tests
+  def self.shutdown; end
 
   context "pscheck with default verbosity option" do
     setup do
@@ -31,15 +17,15 @@ class TestPSCheckDefault < Test::Unit::TestCase
     should "not have the start time" do
       assert_no_match /PatentSafe Check Start/i, @@output
     end
-    
+
     should "not have validating text" do
       assert_no_match /validating TEST0100000003S001 at/i, @@output
     end
-    
+
     should "have checked eighty one signatures" do
       assert_match /Signature packets checked:\s+81/i, @@output
     end
-    
+
     should "have the errors summary" do
       assert_match /-- Errors --/i, @@output
       assert_match /Missing public key:\s+1/i, @@output
@@ -49,7 +35,7 @@ class TestPSCheckDefault < Test::Unit::TestCase
       # How to test missing OpenSSL?
       # assert_match /Skipped signatures\*:\s+13/i, @@output
     end
-    
+
     should "have the successful summary" do
       assert_match /-- Successful checks --/i, @@output
       assert_match /Public keys found:\s+80/i, @@output
@@ -58,8 +44,8 @@ class TestPSCheckDefault < Test::Unit::TestCase
       # Test missing OpenSSL?
       # assert_match /Validated signatures\*:\s+0/i, @@output
     end
-    
+
   end
-  
-  
+
+
 end

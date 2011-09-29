@@ -47,8 +47,10 @@ module TestHelper
 
 end
 
-class Test::Unit::TestCase
+# Our base test class
+class TestCase < Test::Unit::TestCase
   include TestHelper
+  extend TestHelper
 
   def self.tmp_dir
     Dir.mkdir(TestHelper.tmp) unless File.exist?(TestHelper.tmp)
@@ -58,4 +60,30 @@ class Test::Unit::TestCase
   def tmp_dir
     self.class.tmp_dir
   end
+
+  # callbacks
+  def self.startup; end
+
+  def self.shutdown; end
+
+  ## Shoehorn some callbacks into TestUnit
+  def self.suite
+    _suite = super
+
+    # override the run method with a call to callbacks for the give test class
+    _suite.instance_eval %Q{
+      def run(*args)
+        #{self.name}.startup if #{self.name}.respond_to?(:startup)
+        super
+        #{self.name}.shutdown if #{self.name}.respond_to?(:shutdown)
+      end
+    }
+
+    _suite # return the new, modified, suite
+  end
+
+  def default_test
+    # nothing
+  end
+
 end

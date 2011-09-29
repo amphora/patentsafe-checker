@@ -1,27 +1,13 @@
 require  File.dirname(__FILE__)+'/test_helper'
 
-class TestPSCheckVerbose < Test::Unit::TestCase
-  # code to get us startup before all tests
-  class << self
-
-    # runs before all tests
-    def startup
-      @@output = `ruby pscheck.rb -V #{@@dir}`
-    end
-
-    # runs after all tests
-    def shutdown; end
-
-    def suite
-      mysuite = super
-      def mysuite.run(*args)
-        TestPSCheckVerbose.startup()
-        super
-        TestPSCheckVerbose.shutdown()
-      end
-      mysuite
-    end
+class TestPSCheckVerbose < TestCase
+  # runs before all tests
+  def self.startup
+    @@output = `ruby pscheck.rb -V #{@@dir}`
   end
+
+  # runs after all tests
+  def self.shutdown; end
 
   context "pscheck with verbose option" do
     setup do
