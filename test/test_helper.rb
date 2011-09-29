@@ -62,9 +62,9 @@ class TestCase < Test::Unit::TestCase
   end
 
   # callbacks
-  def self.startup; end
+  def self.before; end
 
-  def self.shutdown; end
+  def self.after; end
 
   ## Shoehorn some callbacks into TestUnit
   def self.suite
@@ -73,9 +73,9 @@ class TestCase < Test::Unit::TestCase
     # override the run method with a call to callbacks for the give test class
     _suite.instance_eval %Q{
       def run(*args)
-        #{self.name}.startup if #{self.name}.respond_to?(:startup)
+        #{self.name}.before if #{self.name}.respond_to?(:before)
         super
-        #{self.name}.shutdown if #{self.name}.respond_to?(:shutdown)
+        #{self.name}.after if #{self.name}.respond_to?(:after)
       end
     }
 

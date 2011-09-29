@@ -2,12 +2,12 @@ require  File.dirname(__FILE__)+'/test_helper'
 
 class TestPSCheckQuiet < TestCase
   # runs before all tests
-  def self.startup
+  def self.before
     @@output = `ruby pscheck.rb -q #{@@dir}`
   end
 
   # runs after all tests
-  def self.shutdown; end
+  def self.after; end
 
   context "pscheck with quiet option" do
     setup do

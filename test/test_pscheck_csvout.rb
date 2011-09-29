@@ -2,7 +2,7 @@ require  File.dirname(__FILE__)+'/test_helper'
 
 class TestPSCheckCsvOut < TestCase
   # runs before all tests
-  def self.startup
+  def self.before
     # c = csv
     # f = output filename
     @@docfile = "#{tmp_dir}/pscheck-docout.csv"
@@ -13,7 +13,7 @@ class TestPSCheckCsvOut < TestCase
   end
 
   # runs after all tests
-  def self.shutdown; end
+  def self.after; end
 
   context "pscheck" do
 

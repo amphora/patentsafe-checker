@@ -2,12 +2,12 @@ require  File.dirname(__FILE__)+'/test_helper'
 
 class TestPSCheckDefault < TestCase
   # runs before all tests
-  def self.startup
+  def self.before
     @@output = `ruby pscheck.rb #{@@dir}`
   end
 
   # runs after all tests
-  def self.shutdown; end
+  def self.after; end
 
   context "pscheck with default verbosity option" do
     setup do

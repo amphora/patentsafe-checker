@@ -2,13 +2,13 @@ require  File.dirname(__FILE__)+'/test_helper'
 
 class TestPSCheckExceptions < TestCase
   # runs before all tests
-  def self.startup
+  def self.before
     @@exception_path = "test/fixtures/known_exceptions.txt"
     @@output = `ruby pscheck.rb -V -x #{@@exception_path} #{@@dir}`
   end
 
   # runs after all tests
-  def self.shutdown; end
+  def self.after; end
 
   context "pscheck with bad exception file path" do
     setup do
