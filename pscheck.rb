@@ -268,6 +268,10 @@ class Repository
     nil
   end
 
+  def config_path
+    "#{@path}"/'config.xml'
+  end
+
   def data_path
     "#{@path}"/'data'
   end
@@ -300,6 +304,7 @@ class Repository
       LOG.info ""
     end
 
+    load_configuration
     load_users
     validate_documents
     validate_signatures
@@ -311,8 +316,19 @@ class Repository
     generate_summary_report
   end
 
+  # Loads the config from the xml in the repo
+  def load_configuration
+    LOG.info ""
+    LOG.info "** loading config from #{config_path}"
+    configuration = Configuration.new(:path => config_path,
+                      :verbose => @verbose)
+    LOG.info ""
+    LOG.info "** configuration for #{configuration.server_id} loaded"
+  end
+
   # Loads users from the xml in the repo
   def load_users
+    LOG.info ""
     LOG.info "** loading users from #{users_path}"
 
     Dir["#{users_path.to_pattern}/**/*.xml"].each do |path|
@@ -496,6 +512,26 @@ class Repository
       LOG.warn "-----------------------------------------------------------------------"
       LOG.warn ""
     end
+end
+
+
+# Config is a wrapper around the config xml document
+class Configuration
+  attr_accessor :verbose, :path, :xml
+  attr_reader :server_id, :customer_id, :installation_id
+
+  def initialize(options={})
+    # path, verbose=false
+    @path = options[:path]
+    @verbose = options[:verbose] || false
+
+    @xml = REXML::Document.new(File.read(@path))
+    _server_id = @xml.root.elements["ServerId"]
+    @customer_id = _server_id.get_text("CustomerId").value().to_s
+    @installation_id = _server_id.get_text("InstallationId").value().to_s
+    @server_id = "#{@customer_id}#{@installation_id}"
+  end
+
 end
 
 
