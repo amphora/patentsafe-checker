@@ -1,12 +1,12 @@
-require  File.dirname(__FILE__)+'/test_helper'
+require 'test_helper'
 
-class TestPSCheckOptions < Test::Unit::TestCase
+class TestPSCheckOptions < TestCase
 
   context "pscheck without options" do
     setup do
       @output = `ruby pscheck.rb`
     end
-    
+
     should "display the simple usage" do
       assert_match /pscheck.rb \[options\] path_to_repository/, @output
     end
@@ -16,22 +16,21 @@ class TestPSCheckOptions < Test::Unit::TestCase
     setup do
       @output = `ruby pscheck.rb -h`
     end
-    
+
     should "display the extended usage" do
       assert_match /Displays help message/, @output
     end
   end
-  
+
   context "pscheck with verbose option" do
     setup do
-      @dir = "test/fixtures/ps-v4.0.x/"      
-      @output = `ruby pscheck.rb -V #{@dir}`
+      @output = `ruby pscheck.rb -V #{@@dir}`
     end
 
     should "have the start time" do
       assert_match /PatentSafe Check Start/, @output
     end
   end
-  
-  
+
+
 end

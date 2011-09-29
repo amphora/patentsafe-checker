@@ -29,16 +29,112 @@
 #   -c, --csv           Output docfile/sigfile in csv format [Default]
 #   -j, --json          Output docfile/sigfile in json format
 #   -x, --exceptions    Path to file with a list of known exceptions
-#                       these files are skipped during validation
 #
-#   Known exception file format - each file listed on a new line with
-#   a space after the :
+# == Exceptions File
 #
-#   DOCID: Explanation/comment/note
-#   -----------------------------------------------------------------
-#   i.e.:
-#   AMPH9900011803: This file is corrupt because the hard-drive crashed
-#   AMPH9900011804: This file is known to be corrupt 20 Apr 07
+#  Files listed in this file are skipped during validation. Known exception
+#  file format - each file listed on a new line with a space after the :, e.g.
+#  `DOCID: Explanation/comment/note`. Here is an example.
+#
+#     AMPH9900011803: This file is corrupt because the hard-drive crashed
+#     AMPH9900011804: This file is known to be corrupt 20 Apr 07
+#
+# == Summary report definitions
+#
+#  The checker generates a summary report at the end of process. This report
+#  contains information on what is checked and the results of those checks.
+#
+#  Some definitions may help understand what these calculations mean:
+#
+#  **Document packet**: an xml file that contains information about the
+#  submitted document. Each document has one of these.
+#
+#  **Signature packet**: an xml file that contains information about the signing
+#  of a document. A document may have one or more of these.
+#
+#  **Missing document**: the document packet contains a reference to the
+#  document content (pdf). When that content is not found on the file system it
+#  is considered missing.
+#
+#  **Corrupt document**: when the document xml cannot be parsed (This is not
+#  a corruption of the actual submitted content.)
+#
+#  **Invalid document hash**: PatentSafe creates a hash of the submitted content
+#  (document) and stores that in the document xml. The checker creates
+#  its own internal hash and compares the two. If the checker hash differs
+#  from the PatentSafe hash it is considered invalid.
+#
+#  **Skipped document**: when the checker cannot generate the document hash
+#  (due to a missing library) this check is skipped and the document
+#  cannot be considered validated.
+#
+#  **Corrupt signature**: when the signature xml cannot be parsed.
+#
+#  **Missing public key**: PatentSafe users have a public key that is used
+#  during the signing process. The signature xml retains a copy of that
+#  key. If it can't be found it is considered missing.
+#
+#  **Missing signatures**: the document xml retains a reference to the signature
+#  packets that are created during signing. If that signature packet cannot
+#  be found in the repo it is reported missing.
+#
+#  **Invalid signature text**: the signature packet retains a reference to the
+#  text displayed to the user during signing. The checker generates an
+#  internal version of this and compares it to the original. If they differ
+#  the signature text is considered invalid.
+#
+#  **Invalid content hash**: the signature packet retains a reference to the
+#  PatentSafe calculated hash of the document content. The checker generates
+#  an internal copy of this hash, compares it to the signature's copy and if
+#  they are different it is considered invalid.
+#
+#  **Invalid signature**: if the public key can't be found or the signature,
+#  content hash or public key are invalid the signature is considered invalid.
+#
+#  **Skipped signature**: if the checker cannot generate SHA512 hashes (due to a
+#  missing library) then signature validation is skipped.
+#
+#  **Documents without hash**: it is possible that a document packet is missing
+#  the PatentSafe calculated hash.
+#
+# == Summary report
+#
+#   * Run at - the time the checker ran against a repository
+#   * Document packets checked
+#   * Signature packets checked
+#
+# === If known exceptions are available the following values are calculated:
+#
+#   * Document packets skipped
+#   * Signature packets skipped
+#
+# === If errors are found the following values are calculated:
+#
+#   * Missing documents
+#   * Corrupt documents
+#   * Invalid document hashes
+#   * Skipped documents
+#   * Corrupt signatures
+#   * Missing public key
+#   * Missing signatures
+#   * Invalid signature texts
+#   * Invalid content hashes
+#   * Invalid signatures
+#   * Skipped signatures*
+#
+# === All successful checks are calculated each time:
+#
+#   * Documents w/o hash
+#   * Document hashes
+#   * Public keys found
+#   * Signature texts
+#   * Content hashes
+#   * Valid signatures
+#
+# === If the SHA512  hashes cannot be created a note is included in the report:
+#
+#   Hashes and public_keys could not be validated as the installed
+#   version of OpenSSL does not support SHA512.
 #
 # == Author
 #   Amphora Research Systems, Ltd.
@@ -243,6 +339,7 @@ class Repository
     @results                          = OpenStruct.new
     @results.errors                   = Hash.new
     # document info
+    @results.missing_documents        = 0
     @results.corrupt_documents        = 0
     @results.invalid_document_hashes  = 0
     @results.nohash_documents         = 0
@@ -266,6 +363,10 @@ class Repository
       "7bfa95a688924c47c7d22381f20cc926f524beacb13f84e203d4bd8cb6ba2fce81c57a5f059bf3d509926487bde925b3bcee0635e4f7baeba054e5dba696b2bf"
   rescue
     nil
+  end
+
+  def config_path
+    "#{@path}"/'config.xml'
   end
 
   def data_path
@@ -300,6 +401,8 @@ class Repository
       LOG.info ""
     end
 
+    load_configuration
+    load_timestamp
     load_users
     validate_documents
     validate_signatures
@@ -311,8 +414,55 @@ class Repository
     generate_summary_report
   end
 
+  # Loads the config from the xml in the repo
+  def load_configuration
+    LOG.info ""
+    LOG.info "** loading config from #{config_path}"
+    configuration = Configuration.new(:path => config_path, :verbose => @verbose)
+    LOG.info ""
+    LOG.info "** configuration for #{configuration.server_id} loaded"
+  end
+
+  # Loads last event from the repo as a "timestamp"
+  def load_timestamp
+    LOG.info ""
+    LOG.info "** loading repository timestamp"
+
+    log_path = nil
+
+    # look for events.log
+    v4_log_path = "#{data_path}/events.log"
+
+    if File.exists?(v4_log_path)
+      LOG.info "** events.log found"
+      log_path = v4_log_path
+    else
+      # use last file in the most recent year/month/day
+      if year_dirs = Dir["#{data_path.to_pattern}/[0-9]???"].reverse
+        year_dirs.find do |year_dir|
+          Dir["#{year_dir}/[0-9]?"].reverse.find do |month_dir|
+            Dir["#{month_dir}/[0-9]?"].reverse.find do |day_dir|
+              events_txt_path = "#{day_dir}/events.txt"
+              log_path = events_txt_path if File.exists?(events_txt_path) && !File::Stat.new(events_txt_path).zero?
+            end
+          end # month
+        end # year
+      else
+        LOG.info "  - ERROR: Can't find year directories!"
+      end
+    end
+    LOG.info " - log found at #{log_path}"
+
+    events = Events.new(:path => log_path, :verbose => @verbose)
+    last_event = events.last
+
+    LOG.info ""
+    LOG.info "** repository timestamp is: #{last_event.occurred}"
+  end
+
   # Loads users from the xml in the repo
   def load_users
+    LOG.info ""
     LOG.info "** loading users from #{users_path}"
 
     Dir["#{users_path.to_pattern}/**/*.xml"].each do |path|
@@ -367,6 +517,7 @@ class Repository
         # tally errors here to save time
         unless doc_errors.empty?
           @results.errors[document.document_id] = doc_errors
+          @results.missing_documents        += 1 if doc_errors[:content_missing]
           @results.invalid_document_hashes  += 1 if doc_errors[:invalid_document_hash]
           @results.skipped_documents        += 1 if doc_errors[:skipped_document]
           @results.missing_signatures       += doc_errors[:signature_missing].length if doc_errors[:signature_missing]
@@ -472,13 +623,15 @@ class Repository
       LOG.warn ""
       unless @results.errors.empty?
         LOG.warn "-- Errors --"
+        LOG.warn " Missing documents:         #{@results.missing_documents}" if @results.missing_documents > 0
         LOG.warn " Corrupt documents:         #{@results.corrupt_documents}" if @results.corrupt_documents > 0
         LOG.warn " Invalid document hashes:   #{@results.invalid_document_hashes}" if @results.invalid_document_hashes > 0
         LOG.warn " Skipped documents:         #{@results.skipped_documents}" if @results.skipped_documents > 0
         LOG.warn " Corrupt signatures:        #{@results.corrupt_signatures}" if @results.corrupt_signatures > 0
         LOG.warn " Missing public key:        #{@results.missing_keys}" if @results.missing_keys > 0
+        LOG.warn " Missing signatures:        #{@results.missing_signatures}" if @results.missing_signatures > 0
         LOG.warn " Invalid signature texts:   #{@results.invalid_signature_texts}" if @results.invalid_signature_texts > 0
-        LOG.warn " Invalid content hash:      #{@results.invalid_content_hashes}" if @results.invalid_content_hashes > 0
+        LOG.warn " Invalid content hashes:    #{@results.invalid_content_hashes}" if @results.invalid_content_hashes > 0
         LOG.warn " Invalid signatures:        #{@results.invalid_signatures}" if @results.invalid_signatures > 0 || openssl_sha512?
         LOG.warn " Skipped signatures*:       #{@results.skipped_signatures}" if @results.skipped_signatures > 0
         LOG.warn ""
@@ -496,6 +649,26 @@ class Repository
       LOG.warn "-----------------------------------------------------------------------"
       LOG.warn ""
     end
+end
+
+
+# Config is a wrapper around the config xml document
+class Configuration
+  attr_accessor :verbose, :path, :xml
+  attr_reader :server_id, :customer_id, :installation_id
+
+  def initialize(options={})
+    # path, verbose=false
+    @path = options[:path]
+    @verbose = options[:verbose] || false
+
+    @xml = REXML::Document.new(File.read(@path))
+    _server_id = @xml.root.elements["ServerId"]
+    @customer_id = _server_id.get_text("CustomerId").value().to_s
+    @installation_id = _server_id.get_text("InstallationId").value().to_s
+    @server_id = "#{@customer_id}#{@installation_id}"
+  end
+
 end
 
 
@@ -616,28 +789,33 @@ class Document
     LOG.info ""
     LOG.info " * validating #{document_id} at #{path}"
 
-    if hash_exists?
-      if hash_valid?
-        LOG.info "  - OK:  Generated document hash is consistent with #{content_name}"
-      else
-        if sha512?
-          LOG.error "  - ERROR: #{document_id unless verbose} Generated document hash is inconsistent with #{content_name}"
-          @errors[:invalid_document_hash] = [generated_hash, hash]
+    if File.exists?(content_path)
+      if hash_exists?
+        if hash_valid?
+          LOG.info "  - OK:  Generated document hash is consistent with #{content_name}"
         else
-          LOG.info "  - SKIPPED:  Document hash cannot be validated without OpenSSL SHA512 support"
-          @errors[:skipped_document] = true
-        end
-      end # hash_valid?
+          if sha512?
+            LOG.error "  - ERROR: #{document_id unless verbose} Generated document hash is inconsistent with #{content_name}"
+            @errors[:invalid_document_hash] = [generated_hash, hash]
+          else
+            LOG.info "  - SKIPPED:  Document hash cannot be validated without OpenSSL SHA512 support"
+            @errors[:skipped_document] = true
+          end
+        end # hash_valid?
+      else
+        # If a document doesn't have a hash then it can still be valid!
+        # LOG.info "  - SKIPPED:  Document type '#{document_type}' has no hash"
+        # @errors[:skipped_document] = true
+      end # check_hash?
     else
-      # If a document doesn't have a hash then it can still be valid!
-      # LOG.info "  - SKIPPED:  Document type '#{document_type}' has no hash"
-      # @errors[:skipped_document] = true
-    end # check_hash?
+      LOG.error "  - ERROR: Document content expected at #{content_path}"
+      @errors[:content_missing] = path
+    end
 
     # test if signature files are on disk
     signature_paths.inject(false) do |exists, path|
-      exists = File.exists?(path)
-      if exists
+      sig_exists = File.exists?(path)
+      if sig_exists
         LOG.info "  - OK:  Document signature found at #{path}"
       else
         LOG.error "  - ERROR: Document signature expected at #{path}"
@@ -745,18 +923,23 @@ class Signature
     LOG.info ""
     LOG.info " * validating #{signature_id} at #{path}"
 
-    if signature_text_valid?
-      LOG.info "  - OK:  Generated signature text is consistent with signature packet"
-    else
-      LOG.error "  - ERROR: #{signature_id unless verbose} Generated signature text is inconsistent with signature packet"
-      @errors[:invalid_signature_text] = [generated_signature_text, text]
-    end
+    if File.exists?(signed_content_path)
+      if signature_text_valid?
+        LOG.info "  - OK:  Generated signature text is consistent with signature packet"
+      else
+        LOG.error "  - ERROR: #{signature_id unless verbose} Generated signature text is inconsistent with signature packet"
+        @errors[:invalid_signature_text] = [generated_signature_text, text]
+      end
 
-    if content_hash_valid?
-      LOG.info "  - OK:  Generated document hash is consistent with signature packet"
+      if content_hash_valid?
+        LOG.info "  - OK:  Generated document hash is consistent with signature packet"
+      else
+        LOG.error "  - ERROR: #{signature_id unless verbose} Generated document hash is inconsistent with signature packet"
+        @errors[:invalid_content_hash] = [generated_content_hash, content_hash]
+      end
     else
-      LOG.error "  - ERROR: #{signature_id unless verbose} Generated document hash is inconsistent with signature packet"
-      @errors[:invalid_content_hash] = [generated_content_hash, content_hash]
+      LOG.error "  - ERROR: #{signature_id unless verbose} Cannot validate document hash for missing document at #{signed_content_path}"
+      @errors[:missing_content] = signed_content_path
     end
 
     if public_key_valid?
@@ -786,6 +969,47 @@ class Signature
     public_key_valid?
   end
 
+end
+
+
+class Events
+  attr_accessor :verbose, :path, :file
+
+  def initialize(options={})
+    # path, verbose=false
+    @path = options[:path]
+    @verbose = options[:verbose] || false
+  end
+
+  def last
+    last_line = ""
+    File.open(@path, 'r+'){ |f| f.each { |line| last_line = line unless f.eof? } }
+    Event.new(:content => last_line, :verbose => @verbose)
+  end
+
+end
+
+class Event
+  attr_accessor :verbose, :content, :xml
+  # attributes we care about
+  attr_accessor :event_type, :occurred_at, :occurred
+
+  def initialize(options={})
+    @content = options[:content]
+    @verbose = options[:verbose] || false
+
+    if @content
+      @xml = REXML::Document.new("<root>\n#{@content}\n</root>")
+      _event = @xml.root.elements["event"]
+      @event_type = _event.attribute("type").to_s
+      @occurred = _event.attribute("occured").to_s
+      @occurred_at = Time.parse(@occurred)
+    end
+  end
+
+  def to_s
+    @content
+  end
 end
 
 
@@ -897,5 +1121,3 @@ if __FILE__ == $PROGRAM_NAME
     app = App.new(ARGV, STDIN)
     app.run
 end
-
-
