@@ -3,15 +3,15 @@ require  File.dirname(__FILE__)+'/test_helper'
 class TestPSCheckVerbose < Test::Unit::TestCase
   # code to get us startup before all tests
   class << self
-    
+
     # runs before all tests
     def startup
       @@output = `ruby pscheck.rb -V #{@@dir}`
     end
-    
+
     # runs after all tests
     def shutdown; end
-    
+
     def suite
       mysuite = super
       def mysuite.run(*args)
@@ -31,10 +31,10 @@ class TestPSCheckVerbose < Test::Unit::TestCase
     should "have the start time" do
       assert_match /PatentSafe Check Start/i, @@output
     end
-    
+
     should "have user loading text" do
       # make sure we can test on Windows as well (paths are different)
-      assert_match /loading users from test[\\\/]+fixtures[\\\/]+ps-repositories[\\\/]+5.0[\\\/]+data[\\\/]+users/i, @@output
+      assert_match /loading users from test/i, @@output
     end
 
     should "have loaded seven users" do
@@ -54,32 +54,32 @@ class TestPSCheckVerbose < Test::Unit::TestCase
     should "have document validating text" do
       assert_match /validating TEST0100000005 at/i, @@output
     end
-    
+
     should "have signature validating text" do
       assert_match /validating TEST0100000003S001 at/i, @@output
     end
-    
+
     should "have error text for known invalid document" do
       assert_match /ERROR:  Generated signature text is inconsistent with signature packet/i, @@output
       assert_match /ERROR:  Generated document hash is inconsistent with signature packet/i, @@output
     end
-``    
+``
     should "have error text for known missing public key" do
       assert_match /ERROR:  User public key not found/i, @@output
     end
-    
+
     should "have summary report header" do
       assert_match /PatentSafe Checker Summary Report/i, @@output
     end
-    
+
     should "have checked fifty three documents" do
       assert_match /Document packets checked:\s+53/i, @@output
     end
-    
+
     should "have checked eighty one signatures" do
       assert_match /Signature packets checked:\s+81/i, @@output
     end
-    
+
     should "have the errors summary" do
       assert_match /-- Errors --/i, @@output
       assert_match /Missing public key:\s+1/i, @@output
@@ -89,7 +89,7 @@ class TestPSCheckVerbose < Test::Unit::TestCase
       # How to test missing OpenSSL?
       # assert_match /Skipped signatures\*:\s+13/i, @@output
     end
-    
+
     should "have the successful summary" do
       assert_match /-- Successful checks --/i, @@output
       assert_match /Documents w\/o hash:\s+5/i, @@output
@@ -101,8 +101,8 @@ class TestPSCheckVerbose < Test::Unit::TestCase
       # Test missing OpenSSL?
       # assert_match /Validated signatures\*:\s+0/i, @@output
     end
-    
+
   end
-  
-  
+
+
 end
