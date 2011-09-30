@@ -305,6 +305,7 @@ class Repository
     end
 
     load_configuration
+    load_timestamp
     load_users
     validate_documents
     validate_signatures
@@ -320,10 +321,46 @@ class Repository
   def load_configuration
     LOG.info ""
     LOG.info "** loading config from #{config_path}"
-    configuration = Configuration.new(:path => config_path,
-                      :verbose => @verbose)
+    configuration = Configuration.new(:path => config_path, :verbose => @verbose)
     LOG.info ""
     LOG.info "** configuration for #{configuration.server_id} loaded"
+  end
+
+  # Loads last event from the repo as a "timestamp"
+  def load_timestamp
+    LOG.info ""
+    LOG.info "** loading repository timestamp"
+
+    log_path = nil
+
+    # look for events.log
+    v4_log_path = "#{data_path}/events.log"
+
+    if File.exists?(v4_log_path)
+      LOG.info "** events.log found"
+      log_path = v4_log_path
+    else
+      # use last file in the most recent year/month/day
+      if year_dirs = Dir["#{data_path.to_pattern}/[0-9]???"].reverse
+        year_dirs.find do |year_dir|
+          Dir["#{year_dir}/[0-9]?"].reverse.find do |month_dir|
+            Dir["#{month_dir}/[0-9]?"].reverse.find do |day_dir|
+              events_txt_path = "#{day_dir}/events.txt"
+              log_path = events_txt_path if File.exists?(events_txt_path) && !File::Stat.new(events_txt_path).zero?
+            end
+          end # month
+        end # year
+      else
+        LOG.info "  - ERROR: Can't find year directories!"
+      end
+    end
+    LOG.info " - log found at #{log_path}"
+
+    events = Events.new(:path => log_path, :verbose => @verbose)
+    last_event = events.last
+
+    LOG.info ""
+    LOG.info "** repository timestamp is: #{last_event.occurred}"
   end
 
   # Loads users from the xml in the repo
@@ -822,6 +859,47 @@ class Signature
     public_key_valid?
   end
 
+end
+
+
+class Events
+  attr_accessor :verbose, :path, :file
+
+  def initialize(options={})
+    # path, verbose=false
+    @path = options[:path]
+    @verbose = options[:verbose] || false
+  end
+
+  def last
+    last_line = ""
+    File.open(@path, 'r+'){ |f| f.each { |line| last_line = line unless f.eof? } }
+    Event.new(:content => last_line, :verbose => @verbose)
+  end
+
+end
+
+class Event
+  attr_accessor :verbose, :content, :xml
+  # attributes we care about
+  attr_accessor :event_type, :occurred_at, :occurred
+
+  def initialize(options={})
+    @content = options[:content]
+    @verbose = options[:verbose] || false
+
+    if @content
+      @xml = REXML::Document.new("<root>\n#{@content}\n</root>")
+      _event = @xml.root.elements["event"]
+      @event_type = _event.attribute("type").to_s
+      @occurred = _event.attribute("occured").to_s
+      @occurred_at = Time.parse(@occurred)
+    end
+  end
+
+  def to_s
+    @content
+  end
 end
 
 
