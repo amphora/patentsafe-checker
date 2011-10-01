@@ -243,6 +243,7 @@ class Repository
     @results                          = OpenStruct.new
     @results.errors                   = Hash.new
     # document info
+    @results.missing_documents        = 0
     @results.corrupt_documents        = 0
     @results.invalid_document_hashes  = 0
     @results.nohash_documents         = 0
@@ -420,6 +421,7 @@ class Repository
         # tally errors here to save time
         unless doc_errors.empty?
           @results.errors[document.document_id] = doc_errors
+          @results.missing_documents        += 1 if doc_errors[:content_missing]
           @results.invalid_document_hashes  += 1 if doc_errors[:invalid_document_hash]
           @results.skipped_documents        += 1 if doc_errors[:skipped_document]
           @results.missing_signatures       += doc_errors[:signature_missing].length if doc_errors[:signature_missing]
@@ -525,13 +527,15 @@ class Repository
       LOG.warn ""
       unless @results.errors.empty?
         LOG.warn "-- Errors --"
+        LOG.warn " Missing documents:         #{@results.missing_documents}" if @results.missing_documents > 0
         LOG.warn " Corrupt documents:         #{@results.corrupt_documents}" if @results.corrupt_documents > 0
         LOG.warn " Invalid document hashes:   #{@results.invalid_document_hashes}" if @results.invalid_document_hashes > 0
         LOG.warn " Skipped documents:         #{@results.skipped_documents}" if @results.skipped_documents > 0
         LOG.warn " Corrupt signatures:        #{@results.corrupt_signatures}" if @results.corrupt_signatures > 0
         LOG.warn " Missing public key:        #{@results.missing_keys}" if @results.missing_keys > 0
+        LOG.warn " Missing signatures:        #{@results.missing_signatures}" if @results.missing_signatures > 0
         LOG.warn " Invalid signature texts:   #{@results.invalid_signature_texts}" if @results.invalid_signature_texts > 0
-        LOG.warn " Invalid content hash:      #{@results.invalid_content_hashes}" if @results.invalid_content_hashes > 0
+        LOG.warn " Invalid content hashes:    #{@results.invalid_content_hashes}" if @results.invalid_content_hashes > 0
         LOG.warn " Invalid signatures:        #{@results.invalid_signatures}" if @results.invalid_signatures > 0 || openssl_sha512?
         LOG.warn " Skipped signatures*:       #{@results.skipped_signatures}" if @results.skipped_signatures > 0
         LOG.warn ""
@@ -689,28 +693,33 @@ class Document
     LOG.info ""
     LOG.info " * validating #{document_id} at #{path}"
 
-    if hash_exists?
-      if hash_valid?
-        LOG.info "  - OK:  Generated document hash is consistent with #{content_name}"
-      else
-        if sha512?
-          LOG.error "  - ERROR: #{document_id unless verbose} Generated document hash is inconsistent with #{content_name}"
-          @errors[:invalid_document_hash] = [generated_hash, hash]
+    if File.exists?(content_path)
+      if hash_exists?
+        if hash_valid?
+          LOG.info "  - OK:  Generated document hash is consistent with #{content_name}"
         else
-          LOG.info "  - SKIPPED:  Document hash cannot be validated without OpenSSL SHA512 support"
-          @errors[:skipped_document] = true
-        end
-      end # hash_valid?
+          if sha512?
+            LOG.error "  - ERROR: #{document_id unless verbose} Generated document hash is inconsistent with #{content_name}"
+            @errors[:invalid_document_hash] = [generated_hash, hash]
+          else
+            LOG.info "  - SKIPPED:  Document hash cannot be validated without OpenSSL SHA512 support"
+            @errors[:skipped_document] = true
+          end
+        end # hash_valid?
+      else
+        # If a document doesn't have a hash then it can still be valid!
+        # LOG.info "  - SKIPPED:  Document type '#{document_type}' has no hash"
+        # @errors[:skipped_document] = true
+      end # check_hash?
     else
-      # If a document doesn't have a hash then it can still be valid!
-      # LOG.info "  - SKIPPED:  Document type '#{document_type}' has no hash"
-      # @errors[:skipped_document] = true
-    end # check_hash?
+      LOG.error "  - ERROR: Document content expected at #{content_path}"
+      @errors[:content_missing] = path
+    end
 
     # test if signature files are on disk
     signature_paths.inject(false) do |exists, path|
-      exists = File.exists?(path)
-      if exists
+      sig_exists = File.exists?(path)
+      if sig_exists
         LOG.info "  - OK:  Document signature found at #{path}"
       else
         LOG.error "  - ERROR: Document signature expected at #{path}"
@@ -818,18 +827,23 @@ class Signature
     LOG.info ""
     LOG.info " * validating #{signature_id} at #{path}"
 
-    if signature_text_valid?
-      LOG.info "  - OK:  Generated signature text is consistent with signature packet"
-    else
-      LOG.error "  - ERROR: #{signature_id unless verbose} Generated signature text is inconsistent with signature packet"
-      @errors[:invalid_signature_text] = [generated_signature_text, text]
-    end
+    if File.exists?(signed_content_path)
+      if signature_text_valid?
+        LOG.info "  - OK:  Generated signature text is consistent with signature packet"
+      else
+        LOG.error "  - ERROR: #{signature_id unless verbose} Generated signature text is inconsistent with signature packet"
+        @errors[:invalid_signature_text] = [generated_signature_text, text]
+      end
 
-    if content_hash_valid?
-      LOG.info "  - OK:  Generated document hash is consistent with signature packet"
+      if content_hash_valid?
+        LOG.info "  - OK:  Generated document hash is consistent with signature packet"
+      else
+        LOG.error "  - ERROR: #{signature_id unless verbose} Generated document hash is inconsistent with signature packet"
+        @errors[:invalid_content_hash] = [generated_content_hash, content_hash]
+      end
     else
-      LOG.error "  - ERROR: #{signature_id unless verbose} Generated document hash is inconsistent with signature packet"
-      @errors[:invalid_content_hash] = [generated_content_hash, content_hash]
+      LOG.error "  - ERROR: #{signature_id unless verbose} Cannot validate document hash for missing document at #{signed_content_path}"
+      @errors[:missing_content] = signed_content_path
     end
 
     if public_key_valid?

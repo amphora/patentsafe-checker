@@ -30,7 +30,7 @@ class TestPSCheckDefault < TestCase
       assert_match /-- Errors --/i, @@output
       assert_match /Missing public key:\s+1/i, @@output
       assert_match /Invalid signature texts:\s+1/i, @@output
-      assert_match /Invalid content hash:\s+1/i, @@output
+      assert_match /Invalid content hashes:\s+1/i, @@output
       assert_match /Invalid signatures:\s+1/i, @@output
       # How to test missing OpenSSL?
       # assert_match /Skipped signatures\*:\s+13/i, @@output
