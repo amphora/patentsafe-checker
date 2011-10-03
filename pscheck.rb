@@ -32,9 +32,9 @@
 #
 # == Exceptions File
 #
-# Files listed in this file are skipped during validation. Known exception file
-# format - each file listed on a new line with a space after the :, e.g.
-# `DOCID: Explanation/comment/note`. Here is an example.
+#  Files listed in this file are skipped during validation. Known exception
+#  file format - each file listed on a new line with a space after the :, e.g.
+#  `DOCID: Explanation/comment/note`. Here is an example.
 #
 #     AMPH9900011803: This file is corrupt because the hard-drive crashed
 #     AMPH9900011804: This file is known to be corrupt 20 Apr 07
@@ -46,11 +46,15 @@
 #
 #  Some definitions may help understand what these calculations mean:
 #
-#  **Document packet**: an xml file that that contains information about the
+#  **Document packet**: an xml file that contains information about the
 #  submitted document. Each document has one of these.
 #
-#  **Missing document**: when the xml contains a reference to the document and
-#  that document is not found on the file system it is considered missing.
+#  **Signature packet**: an xml file that contains information about the signing
+#  of a document. A document may have one or more of these.
+#
+#  **Missing document**: the document packet contains a reference to the
+#  document content (pdf). When that content is not found on the file system it
+#  is considered missing.
 #
 #  **Corrupt document**: when the document xml cannot be parsed (This is not
 #  a corruption of the actual submitted content.)
@@ -63,9 +67,6 @@
 #  **Skipped document**: when the checker cannot generate the document hash
 #  (due to a missing library) this check is skipped and the document
 #  cannot be considered validated.
-#
-#  **Signature packet**: an xml file that contains information about the signing
-#  of a document. A document may have one or more of these.
 #
 #  **Corrupt signature**: when the signature xml cannot be parsed.
 #
@@ -1120,5 +1121,3 @@ if __FILE__ == $PROGRAM_NAME
     app = App.new(ARGV, STDIN)
     app.run
 end
-
-

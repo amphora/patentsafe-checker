@@ -77,11 +77,15 @@ format - each file listed on a new line with a space after the :, e.g.
 
  Some definitions may help understand what these calculations mean:
 
- **Document packet**: an xml file that that contains information about the
+ **Document packet**: an xml file that contains information about the
  submitted document. Each document has one of these.
 
- **Missing document**: when the xml contains a reference to the document and
- that document is not found on the file system it is considered missing.
+ **Signature packet**: an xml file that contains information about the signing
+ of a document. A document may have one or more of these.
+
+ **Missing document**: the document packet contains a reference to the 
+ document content (pdf). When that content is not found on the file system it 
+ is considered missing.
 
  **Corrupt document**: when the document xml cannot be parsed (This is not
  a corruption of the actual submitted content.)
@@ -94,9 +98,6 @@ format - each file listed on a new line with a space after the :, e.g.
  **Skipped document**: when the checker cannot generate the document hash
  (due to a missing library) this check is skipped and the document
  cannot be considered validated.
-
- **Signature packet**: an xml file that contains information about the signing
- of a document. A document may have one or more of these.
 
  **Corrupt signature**: when the signature xml cannot be parsed.
 
