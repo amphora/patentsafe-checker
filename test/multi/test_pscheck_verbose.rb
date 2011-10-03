@@ -1,9 +1,9 @@
-require  File.dirname(__FILE__)+'/test_helper'
+require 'test_helper'
 
 class TestPSCheckVerbose < TestCase
   # runs before all tests
   def self.before
-    @@output = `ruby pscheck.rb -V #{@@dir}`
+    @@output = `ruby pscheck.rb -V #{dir}`
   end
 
   # runs after all tests
@@ -24,7 +24,7 @@ class TestPSCheckVerbose < TestCase
     end
 
     should "have loaded seven users" do
-      assert_match /7 users loaded/i, @@output
+      assert_match /8 users loaded/i, @@output
     end
 
     should "have the correct list of users" do

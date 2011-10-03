@@ -1,4 +1,4 @@
-require  File.dirname(__FILE__)+'/test_helper'
+require 'test_helper'
 
 class TestPSCheckCsvOut < TestCase
   # runs before all tests
@@ -6,10 +6,10 @@ class TestPSCheckCsvOut < TestCase
     # c = csv
     # f = output filename
     @@docfile = "#{tmp_dir}/pscheck-docout.csv"
-    @@docoutput = `ruby pscheck.rb -V -c -d #{@@docfile} #{@@dir}`
+    @@docoutput = `ruby pscheck.rb -V -c -d #{@@docfile} #{dir}`
 
     @@sigfile = "#{tmp_dir}/pscheck-sigout.csv"
-    @@sigoutput = `ruby pscheck.rb -V -c -s #{@@sigfile} #{@@dir}`
+    @@sigoutput = `ruby pscheck.rb -V -c -s #{@@sigfile} #{dir}`
   end
 
   # runs after all tests

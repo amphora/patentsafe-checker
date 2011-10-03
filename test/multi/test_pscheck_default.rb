@@ -1,9 +1,9 @@
-require  File.dirname(__FILE__)+'/test_helper'
+require 'test_helper'
 
 class TestPSCheckDefault < TestCase
   # runs before all tests
   def self.before
-    @@output = `ruby pscheck.rb #{@@dir}`
+    @@output = `ruby pscheck.rb #{dir}`
   end
 
   # runs after all tests

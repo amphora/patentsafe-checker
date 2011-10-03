@@ -1,10 +1,10 @@
-require  File.dirname(__FILE__)+'/test_helper'
+require 'test_helper'
 
 class TestPSCheckYear < TestCase
   # runs before all tests
   def self.before
-    @@output09 = `ruby pscheck.rb -V #{@@dir} -y 2009`
-    @@output10 = `ruby pscheck.rb -V #{@@dir} -y 2010`
+    @@output09 = `ruby pscheck.rb -V #{dir} -y 2009`
+    @@output10 = `ruby pscheck.rb -V #{dir} -y 2010`
   end
 
   # runs after all tests

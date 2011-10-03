@@ -17,9 +17,9 @@ class MultiRunner < Test::Unit::UI::Console::TestRunner
 
   def self.run(suite, output_level=NORMAL, io=STDOUT)
     results = Test::Unit::TestResult.new # shared results object
-    TestHelper.dirs.each do |dir|
+    TestCase.dirs.each do |dir|
       puts "Running tests for #{dir}"
-      TestHelper.dir = dir # set the current directory
+      TestCase.dir = dir # set the current directory
       new(suite, output_level, io, results).start
     end
     results

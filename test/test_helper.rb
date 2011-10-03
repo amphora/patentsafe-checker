@@ -9,13 +9,17 @@ rescue LoadError
   exit
 end
 
-module TestHelper
+# Our base test class
+class TestCase < Test::Unit::TestCase
 
   # List of patentsafe dirs that will be used for the test, each one is used in
   # in order and the custome MultiRunner sets the self.dir for all the tests to
   # to use in each run.
   def self.dirs
-    ["test/fixtures/ps-repositories/5.0/", "test/fixtures/ps-repositories/4.8/"]
+    ["test/fixtures/ps-repositories/5.2/",
+     "test/fixtures/ps-repositories/5.1/",
+     "test/fixtures/ps-repositories/5.0/",
+     "test/fixtures/ps-repositories/4.8/"]
   end
 
   # accessors for dir
@@ -24,7 +28,7 @@ module TestHelper
   end
 
   def self.dir
-    @@dir
+    @@dir ||= dirs.first
   end
 
   # accessors for tmp
@@ -45,16 +49,9 @@ module TestHelper
     self.class.tmp
   end
 
-end
-
-# Our base test class
-class TestCase < Test::Unit::TestCase
-  include TestHelper
-  extend TestHelper
-
   def self.tmp_dir
-    Dir.mkdir(TestHelper.tmp) unless File.exist?(TestHelper.tmp)
-    return TestHelper.tmp
+    Dir.mkdir(tmp) unless File.exist?(tmp)
+    return tmp
   end
 
   def tmp_dir

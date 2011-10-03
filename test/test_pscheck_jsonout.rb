@@ -1,4 +1,4 @@
-require  File.dirname(__FILE__)+'/test_helper'
+require 'test_helper'
 
 class TestPSCheckJsonOut < TestCase
   # runs before all tests
@@ -6,10 +6,10 @@ class TestPSCheckJsonOut < TestCase
     # c = csv
     # f = output filename
     @@docfile = "#{tmp_dir}/pscheck-docout.json"
-    @@docoutput = `ruby pscheck.rb -V -j -d #{@@docfile} #{@@dir}`
+    @@docoutput = `ruby pscheck.rb -V -j -d #{@@docfile} #{dir}`
 
     @@sigfile = "#{tmp_dir}/pscheck-sigout.json"
-    @@sigoutput = `ruby pscheck.rb -V -j -s #{@@sigfile} #{@@dir}`
+    @@sigoutput = `ruby pscheck.rb -V -j -s #{@@sigfile} #{dir}`
   end
 
   # runs after all tests
