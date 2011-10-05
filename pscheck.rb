@@ -165,6 +165,7 @@ require 'ostruct'
 require 'pathname'
 require 'rdoc/usage'
 require 'rexml/document'
+require 'time'
 require 'yaml'
 
 # setup the logger if this is the main file
@@ -180,7 +181,7 @@ end
 # To see what is really happening - jump to the process_command method
 #
 class App
-  VERSION = '5.3'
+  VERSION = '5.4'
 
   attr_reader :options
 
