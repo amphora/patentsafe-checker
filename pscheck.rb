@@ -566,7 +566,7 @@ class Repository
         sig_errors = signature.validate
 
         # check if user public key can be found
-        if @users[signature.signer_id].keys.include?(signature.public_key)
+        if @users[signature.signer_id] && @users[signature.signer_id].keys.include?(signature.public_key)
           LOG.info "  - OK:  User public key is consistent with database"
         else
           LOG.error "  - ERROR: #{signature.signature_id unless @verbose} User public key not found (this may not be a problem - make sure you can find the identity certificate)"
