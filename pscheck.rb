@@ -457,7 +457,11 @@ class Repository
     last_event = events.last
 
     LOG.info ""
-    LOG.info "** repository timestamp is: #{last_event.occurred}"
+    if last_event.occurred.nil?
+      LOG.info "** could not load repository timestamp"
+    else
+      LOG.info "** repository timestamp is: #{last_event.occurred}"
+    end
   end
 
   # Loads users from the xml in the repo
@@ -983,7 +987,7 @@ class Events
 
   def last
     last_line = ""
-    File.open(@path, 'r+'){ |f| f.each { |line| last_line = line unless f.eof? } }
+    File.open(@path, 'r+'){ |f| f.each { |line| last_line = line } }
     Event.new(:content => last_line, :verbose => @verbose)
   end
 
@@ -1000,10 +1004,11 @@ class Event
 
     if @content
       @xml = REXML::Document.new("<root>\n#{@content}\n</root>")
-      _event = @xml.root.elements["event"]
-      @event_type = _event.attribute("type").to_s
-      @occurred = _event.attribute("occured").to_s
-      @occurred_at = Time.parse(@occurred)
+      if _event = @xml.root.elements["event"]
+        @event_type = _event.attribute("type").to_s
+        @occurred = _event.attribute("occured").to_s
+        @occurred_at = Time.parse(@occurred)
+      end
     end
   end
 
