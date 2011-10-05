@@ -180,7 +180,7 @@ end
 # To see what is really happening - jump to the process_command method
 #
 class App
-  VERSION = '5.2-dev'
+  VERSION = '5.3'
 
   attr_reader :options
 
