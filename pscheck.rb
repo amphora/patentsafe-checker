@@ -24,6 +24,7 @@
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Verbose output
 #   -y, --year          Only scan year given
+#   -r, --repofile      Filename to output repository information
 #   -d, --docfile       Filename to output list of documents
 #   -s, --sigfile       Filename to output list of signatures
 #   -c, --csv           Output docfile/sigfile in csv format [Default]
@@ -229,6 +230,7 @@ class App
       opts.on('-V', '--verbose')             { @options.verbose = true }
       opts.on('-q', '--quiet')               { @options.quiet = true }
       opts.on('-y', '--year [yyyy]')         { |yyyy| @options.year = yyyy }
+      opts.on('-r', '--repofile [repofilename]') { |repofilename| @options.repofile = repofilename }
       opts.on('-d', '--docfile [docfilename]')  { |docfilename| @options.docfile = docfilename }
       opts.on('-s', '--sigfile [sigfilename]')  { |sigfilename| @options.sigfile = sigfilename }
       opts.on('-c', '--csv')                 { @options.format = 'csv' }
@@ -308,6 +310,7 @@ class App
                             :year => @options.year,
                             :known_exceptions => @known_exceptions,
                             :verbose => @options.verbose,
+                            :repofile => @options.repofile,
                             :docfile => @options.docfile,
                             :sigfile => @options.sigfile,
                             :format => @options.format)
@@ -322,7 +325,7 @@ end
 class Repository
   attr_accessor :verbose
   attr_accessor :path
-  attr_reader :results
+  attr_reader :results, :customer_id, :installation_id, :server_id, :timestamp, :document_count, :bit_count
 
   def initialize(options={})
     # base_path, year=nil, verbose=false
@@ -330,6 +333,7 @@ class Repository
     @year = options[:year]
     @known_exceptions = options[:known_exceptions] || {}
     @verbose = options[:verbose] || false
+    @repofile = options[:repofile]
     @docfile = options[:docfile]
     @sigfile = options[:sigfile]
     @format = options[:format]
@@ -359,6 +363,14 @@ class Repository
     @results.known_signatures_skipped = 0
   end
 
+  def self.columns
+    ["Customer ID", "Installation ID", "Server ID", "Timestamp", "Document Count", "Bit Count"]
+  end
+
+  def to_row
+    [customer_id, installation_id, server_id, timestamp, document_count, bit_count]
+  end
+
   def openssl_sha512?
     @openssl_sha512 ||= OpenSSL::Digest::SHA512.hexdigest('TEST') ==
       "7bfa95a688924c47c7d22381f20cc926f524beacb13f84e203d4bd8cb6ba2fce81c57a5f059bf3d509926487bde925b3bcee0635e4f7baeba054e5dba696b2bf"
@@ -368,6 +380,10 @@ class Repository
 
   def config_path
     "#{@path}"/'config.xml'
+  end
+
+  def id_values_path
+    "#{data_path}"/'config'/'id-values.xml'
   end
 
   def data_path
@@ -403,6 +419,7 @@ class Repository
     end
 
     load_configuration
+    load_counts
     load_timestamp
     load_users
     validate_documents
@@ -418,10 +435,27 @@ class Repository
   # Loads the config from the xml in the repo
   def load_configuration
     LOG.info ""
-    LOG.info "** loading config from #{config_path}"
+    LOG.info "** loading configuration from #{config_path}"
+
     configuration = Configuration.new(:path => config_path, :verbose => @verbose)
+    @customer_id = configuration.customer_id
+    @installation_id = configuration.installation_id
+    @server_id = configuration.server_id
+
     LOG.info ""
-    LOG.info "** configuration for #{configuration.server_id} loaded"
+    LOG.info "** configuration for #{@server_id} loaded"
+  end
+
+  def load_counts
+    LOG.info ""
+    LOG.info "** loading id-values from #{id_values_path}"
+
+    id_values = IdValues.new(:path => id_values_path, :verbose => @verbose)
+    @document_count = id_values.ids[@server_id]
+    @bit_count = id_values.ids["#{@customer_id}--"]
+
+    LOG.info ""
+    LOG.info "** id-values for #{@server_id} loaded"
   end
 
   # Loads last event from the repo as a "timestamp"
@@ -461,7 +495,8 @@ class Repository
     if last_event.occurred.nil?
       LOG.info "** could not load repository timestamp"
     else
-      LOG.info "** repository timestamp is: #{last_event.occurred}"
+      @timestamp = last_event.occurred
+      LOG.info "** repository timestamp is: #{@timestamp}"
     end
   end
 
@@ -597,6 +632,7 @@ class Repository
 
     def generate_output_files
       # overwrite old files
+      write_formatted_file(@repofile, @format, Repository.columns, [self.to_row]) if @repofile
       write_formatted_file(@docfile, @format, Document.columns, @docs) if @docfile
       write_formatted_file(@sigfile, @format, Signature.columns, @sigs) if @sigfile
     end
@@ -672,6 +708,26 @@ class Configuration
     @customer_id = _server_id.get_text("CustomerId").value().to_s
     @installation_id = _server_id.get_text("InstallationId").value().to_s
     @server_id = "#{@customer_id}#{@installation_id}"
+  end
+
+end
+
+
+# IdValues is a wrapper around the id-values xml document
+class IdValues
+  attr_accessor :verbose, :path, :xml
+  attr_reader :ids
+
+  def initialize(options={})
+    # path, verbose=false
+    @path = options[:path]
+    @verbose = options[:verbose] || false
+    @ids = {}
+
+    @xml = REXML::Document.new(File.read(@path))
+    @xml.root.elements.each("id-value") do |id|
+      @ids[id.attribute("serverId").to_s] = id.attribute("count").to_s
+    end
   end
 
 end
@@ -1039,13 +1095,13 @@ class Formatter
     @rows = rows
     @row_count = rows.length
 
-    "".tap do |out|
-      out << header
-      rows.each_with_index do |r, i|
-        out << row(r, i)
-      end
-      out << footer
+    out = ""
+    out << header
+    rows.each_with_index do |r, i|
+      out << row(r, i)
     end
+    out << footer
+    out
   end
 
   def quote(val)
@@ -1077,15 +1133,15 @@ module JsonFormatter
   end
 
   def row(r, ri)
-    "".tap do |out|
-      out << "  {"
-      @columns.each_with_index do |col, i|
-         out << "#{quote(col)}:#{quote(r[i])}"
-         out << (i == @col_count-1 ? "" : ",")
-      end
-      out << "}"
-      out << (ri == @row_count-1 ? "\n" : ",\n")
+    out = ""
+    out << "  {"
+    @columns.each_with_index do |col, i|
+       out << "#{quote(col)}:#{quote(r[i])}"
+       out << (i == @col_count-1 ? "" : ",")
     end
+    out << "}"
+    out << (ri == @row_count-1 ? "\n" : ",\n")
+    out
   end
 
   def footer
