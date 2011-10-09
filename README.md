@@ -54,6 +54,7 @@ For help use: `ruby pscheck.rb -h`
     -q, --quiet       Output as little as possible, overrides verbose
     -V, --verbose     Verbose output
     -y, --year        Only scan year given
+    -r, --repofile    Filename to output repository information
     -d, --docfile     Filename to output list of documents
     -s, --sigfile     Filename to output list of signatures
     -c, --csv         Output docfile/sigfile in csv format [Default]
