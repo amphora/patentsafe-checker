@@ -168,7 +168,7 @@ class HostedChecker
           end
         end # End waiting on the Mutex
 
-        puts "Checker worker running on #{z} thread=#{Thread.current.to_s}"
+        puts "Checker worker running on #{z} remaining=#{$to_check.size} thread=#{Thread.current.to_s}"
 
         # If we have a value then do something (and don't run on invisible directories)
         if not(done) && z[0..0] != "."
