@@ -127,28 +127,83 @@ class HostedChecker
     # This is where the Script actually does something
     # Get all the directories in base_path and see if there's something in path_suffix
     # If there is, run against it
-    def process_command      
-      Dir.new(@base_path).each do | z |
-        # This doesn't work on Windows but who cares? We only host on Unix
-        repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
-        if File.exists?(repository_directory)
-          if File.exists?("#{repository_directory}/disable_checker")
-            LOG.info "========================================================================================================================"
-            LOG.info "Not Running on #{repository_directory} because disable_checker is present"
-            LOG.info "========================================================================================================================"
-          else
-            LOG.info "========================================================================================================================"
-            LOG.info "Running on #{repository_directory}"
-            LOG.info "========================================================================================================================"
-            repo = Repository.new(:base_path => repository_directory)
-            repo.check
-          end
-        else
-          LOG.info "**** No directory #{repository_directory}"
-        end
-
+    def process_command 
+      # Create an array of the Paths we want to check - global variable so the worker function can see it
+      $to_check = Dir.new(@base_path)
+      # And a Mutex to control access to this so the threads don't trip over each other - global variable so the worker function can see it
+      $to_check_mutex = Mutex.new
+      
+      # Kick off the threads
+      threads = []
+      4.times do
+        threads << Thread.new {checker_worker}
       end
-    end    
+
+      # And wait on them to terminate
+      threads.each { |aThread|  aThread.join }
+
+    end   
+    
+    def checker_worker
+      done = false
+      until done do
+        # Get exclusive access to the $to_check array
+        $to_check_mutex.synchronize do
+          # If there's nothing there then we can stop
+          if $to_check.size == 0
+            done = true
+          else
+            # Get a value to play with and remove from the array
+            z = $to_check.delete_at(0)
+          end
+        end # End waiting on the Mutex
+
+        # If we have a value then do something 
+        if not(done)
+          # Run the checker
+          repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
+          if File.exists?(repository_directory)
+            if File.exists?("#{repository_directory}/disable_checker")
+              LOG.info "========================================================================================================================"
+              LOG.info "Not Running on #{repository_directory} because disable_checker is present"
+              LOG.info "========================================================================================================================"
+            else
+              LOG.info "========================================================================================================================"
+              LOG.info "Running on #{repository_directory}"
+              LOG.info "========================================================================================================================"
+              repo = Repository.new(:base_path => repository_directory)
+              repo.check
+            end
+          else
+            LOG.info "**** No directory #{repository_directory}"
+          end
+        end
+      end
+    end
+    
+    # def process_command      
+    #   Dir.new(@base_path).each do | z |
+    #     # This doesn't work on Windows but who cares? We only host on Unix
+    #     repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
+    #     if File.exists?(repository_directory)
+    #       if File.exists?("#{repository_directory}/disable_checker")
+    #         LOG.info "========================================================================================================================"
+    #         LOG.info "Not Running on #{repository_directory} because disable_checker is present"
+    #         LOG.info "========================================================================================================================"
+    #       else
+    #         LOG.info "========================================================================================================================"
+    #         LOG.info "Running on #{repository_directory}"
+    #         LOG.info "========================================================================================================================"
+    #         repo = Repository.new(:base_path => repository_directory)
+    #         repo.check
+    #       end
+    #     else
+    #       LOG.info "**** No directory #{repository_directory}"
+    #     end
+    # 
+    #   end
+    # end    
+     
 end
 
 # Create and run the application
