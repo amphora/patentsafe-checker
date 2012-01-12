@@ -132,15 +132,21 @@ class HostedChecker
         # This doesn't work on Windows but who cares? We only host on Unix
         repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
         if File.exists?(repository_directory)
-          LOG.info "========================================================================================================================"
-          LOG.info "Running on #{repository_directory}"
-          LOG.info "========================================================================================================================"
-          repo = Repository.new(:base_path => repository_directory)
-          repo.check
+          if File.exists?("#{repository_directory}/disable_checker")
+            LOG.info "========================================================================================================================"
+            LOG.info "Not Running on #{repository_directory} because disable_checker is present"
+            LOG.info "========================================================================================================================"
+          else
+            LOG.info "========================================================================================================================"
+            LOG.info "Running on #{repository_directory}"
+            LOG.info "========================================================================================================================"
+            repo = Repository.new(:base_path => repository_directory)
+            repo.check
+          end
         else
           LOG.info "**** No directory #{repository_directory}"
         end
-        
+
       end
     end    
 end
