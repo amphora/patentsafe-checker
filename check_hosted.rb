@@ -132,7 +132,7 @@ class HostedChecker
     # If there is, run against it
     def process_command 
       # Create an array of the Paths we want to check - global variable so the worker function can see it
-      $to_check = Dir.new(@base_path)
+      $to_check = Dir.new(@base_path).entries
       # And a Mutex to control access to this so the threads don't trip over each other - global variable so the worker function can see it
       $to_check_mutex = Mutex.new
       
