@@ -84,6 +84,7 @@ class HostedChecker
       # specify options
       opts = OptionParser.new 
       opts.on('-h', '--help')         { output_help }
+      opts.on('-V', '--verbose')             { @options.verbose = true }
       opts.parse!(@arguments) rescue return false
       process_options
       true      
@@ -149,15 +150,18 @@ class HostedChecker
     
     def checker_worker
       done = false
+      z = ""
       until done do
         # Get exclusive access to the $to_check array
         $to_check_mutex.synchronize do
           # If there's nothing there then we can stop
           if $to_check.size == 0
             done = true
+            LOG.info "Nothing else to do so quitting"
           else
             # Get a value to play with and remove from the array
             z = $to_check.delete_at(0)
+            LOG.info "Working on #{z}"
           end
         end # End waiting on the Mutex
 
