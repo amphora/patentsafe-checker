@@ -170,8 +170,8 @@ class HostedChecker
 
         puts "Checker worker running on #{z} thread=#{Thread.current.to_s}"
 
-        # If we have a value then do something 
-        if not(done)
+        # If we have a value then do something (and don't run on invisible directories)
+        if not(done) && z[0..0] != "."
           # Run the checker
           repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
           if File.exists?(repository_directory)
