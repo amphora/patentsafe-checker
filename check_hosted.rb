@@ -142,13 +142,16 @@ class HostedChecker
       4.times do
         threads << Thread.new {checker_worker}
       end
-
+      
+      puts "Threads runnning:"
+      Thread.list.each {|thr| p thr }
       # And wait on them to terminate
       threads.each { |aThread|  aThread.join }
 
     end   
     
     def checker_worker
+      puts "Checker worker started #{Thread.current.to_s}"
       done = false
       z = ""
       until done do
@@ -164,6 +167,8 @@ class HostedChecker
             LOG.info "Working on #{z}"
           end
         end # End waiting on the Mutex
+
+        puts "Checker worker running on #{z} thread=#{Thread.current.to_s}"
 
         # If we have a value then do something 
         if not(done)
