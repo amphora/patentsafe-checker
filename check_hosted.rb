@@ -46,6 +46,9 @@ require 'ostruct'
 # The Repository checker 
 require "pscheck"
 
+# For Threading
+require 'thread'
+
 # setup our logger STDOUT for now
 LOG = Logger.new(STDOUT)
 # Only report errors
