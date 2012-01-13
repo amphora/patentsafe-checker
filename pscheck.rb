@@ -168,6 +168,7 @@ require 'rdoc/usage'
 require 'rexml/document'
 require 'time'
 require 'yaml'
+require 'rubygems'
 
 # setup the logger if this is the main file
 if __FILE__ == $PROGRAM_NAME
