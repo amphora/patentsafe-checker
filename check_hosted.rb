@@ -183,22 +183,22 @@ class HostedChecker
               LOG.info "========================================================================================================================"
               LOG.info "Running on #{repository_directory}"
               LOG.info "========================================================================================================================"
-              try
-              repo = Repository.new(:base_path => repository_directory)
-              repo.check
-            rescue
-              puts "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-              puts "Error Running on #{repository_directory}"
-              puts "#{$!}"
-              puts "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+              begin
+                repo = Repository.new(:base_path => repository_directory)
+                repo.check
+              rescue
+                puts "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                puts "Error Running on #{repository_directory}"
+                puts "#{$!}"
+                puts "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+              end
+            else
+              LOG.info "**** No directory #{repository_directory}"
             end
-          else
-            LOG.info "**** No directory #{repository_directory}"
           end
         end
       end
-    end
-    
+
     # def process_command      
     #   Dir.new(@base_path).each do | z |
     #     # This doesn't work on Windows but who cares? We only host on Unix
