@@ -38,9 +38,6 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Sometimes we need Rubygems
-require 'rubygems'
-
 # Things we need to process command line arguments
 require 'optparse' 
 require 'rdoc/usage'
