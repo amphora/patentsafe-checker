@@ -164,7 +164,6 @@ require 'optparse'
 require 'openssl'
 require 'ostruct'
 require 'pathname'
-require 'rdoc/usage'
 require 'rexml/document'
 require 'time'
 require 'yaml'
@@ -286,16 +285,21 @@ class App
 
     def output_help
       puts version_text
-      RDoc::usage() #exits app
+      # RDoc::usage() #exits app
+      # TODO output proper options
+      puts @options
     end
 
     def output_usage
-      RDoc::usage('usage') # gets usage from comments above
+      # TODO output proper options
+      puts @options
+      # RDoc::usage('usage') # gets usage from comments above
     end
 
     def output_version
       puts version_text
-      puts RDoc::usage('copyright')
+      puts OptionParser::Version.join('.')
+      # puts RDoc::usage('copyright')
     end
 
     def version_text
@@ -636,6 +640,17 @@ class Repository
       write_formatted_file(@repofile, @format, Repository.columns, [self.to_row]) if @repofile
       write_formatted_file(@docfile, @format, Document.columns, @docs) if @docfile
       write_formatted_file(@sigfile, @format, Signature.columns, @sigs) if @sigfile
+    end
+    
+    # Return the repository data as YAML
+    def get_repository_data_as_yaml
+      repository_data = {
+        :repository => self,
+        :documents => @docs,
+        :signatures => @sigs
+      }
+      data_as_yaml = YAML::dump(repository_data)
+      return data_as_yaml
     end
 
     def write_formatted_file(path, format, columns, data)
