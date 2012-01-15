@@ -40,11 +40,10 @@
 
 # Things we need to process command line arguments
 require 'optparse' 
-require 'rdoc/usage'
 require 'ostruct'
 
 # The Repository checker 
-require "pscheck"
+require "./pscheck"
 
 # For Threading
 require 'thread'
@@ -116,16 +115,16 @@ class HostedChecker
 
   def output_help
     puts version_text
-    RDoc::usage() #exits app
+    # RDoc::usage() #exits app
   end
 
   def output_usage
-    RDoc::usage('usage') # gets usage from comments above
+    # RDoc::usage('usage') # gets usage from comments above
   end
 
   def output_version
     puts version_text
-    puts RDoc::usage('copyright')
+    puts OptionParser::Version.join('.')
   end
 
   # This is where the Script actually does something
@@ -186,6 +185,7 @@ class HostedChecker
             begin
               repo = Repository.new(:base_path => repository_directory)
               repo.check
+              repository_status = repo.get_repository_data_as_yaml
             rescue
               puts "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
               puts "Error Running on #{repository_directory}"
