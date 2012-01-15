@@ -183,7 +183,7 @@ class HostedChecker
             LOG.info "Running on #{repository_directory}"
             LOG.info "========================================================================================================================"
             begin
-              repo = Repository.new(:base_path => repository_directory)
+              repo = Repository.new(:base_path => repository_directory, :verbose => @options.verbose)
               repo.check
               repository_status = repo.get_repository_data_as_yaml
             rescue
