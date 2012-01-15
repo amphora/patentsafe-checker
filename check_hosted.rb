@@ -48,6 +48,17 @@ require "./pscheck"
 # For Threading
 require 'thread'
 
+# This is for controlling processes
+require 'open3'
+
+# HTTP stuff 
+require 'net/http'
+require 'uri'
+
+# Logging
+require 'logger'
+
+
 # setup our logger STDOUT for now
 LOG = Logger.new(STDOUT)
 # Only report errors
@@ -68,6 +79,15 @@ class HostedChecker
   # Parse options, check arguments, then process the command
   def run
     if parsed_options? && arguments_valid? 
+      if @options.verbose
+        LOG.level = Logger::INFO
+      elsif @options.quiet
+        LOG.level = Logger::ERROR
+      else
+        # The default is WARN
+        LOG.level = Logger::WARN
+      end
+      
       # arguments then the pscheck command itself
       process_arguments
       process_command
@@ -82,8 +102,9 @@ class HostedChecker
   def parsed_options?
     # specify options
     opts = OptionParser.new 
-    opts.on('-h', '--help')         { output_help }
-    opts.on('-V', '--verbose')             { @options.verbose = true }
+    opts.on('-h', '--help')        { output_help }
+    opts.on('-V', '--verbose')     { @options.verbose = true }
+    opts.on('-u', '--upload [uploadurl]')      { |uploadurl| @options.uploadurl = uploadurl }
     opts.parse!(@arguments) rescue return false
     process_options
     true      
@@ -136,13 +157,16 @@ class HostedChecker
     # And a Mutex to control access to this so the threads don't trip over each other - global variable so the worker function can see it
     $to_check_mutex = Mutex.new
 
+    # Get the hostname in case we need to submit to the repository monitor
+    @hostname = %x{hostname -s}.strip
+
     # Kick off the threads
     threads = []
     4.times do
       threads << Thread.new {checker_worker}
     end
 
-    puts "Threads runnning:"
+    LOG.info "Threads runnning:"
     Thread.list.each {|thr| p thr }
     # And wait on them to terminate
     threads.each { |aThread|  aThread.join }
@@ -150,7 +174,7 @@ class HostedChecker
   end   
 
   def checker_worker
-    puts "Checker worker started #{Thread.current.to_s}"
+    LOG.info "Checker worker started #{Thread.current.to_s}"
     done = false
     z = ""
     until done do
@@ -186,11 +210,20 @@ class HostedChecker
               repo = Repository.new(:base_path => repository_directory, :verbose => @options.verbose)
               repo.check
               repository_status = repo.get_repository_data_as_yaml
+              # Upload the repository data to the main database if required
+              if @options.uploadurl
+                res = Net::HTTP.post_form(URI.parse(@options.uploadurl), 
+                { 'hostname'=> @hostname, 
+                  'repository_directory' => repository_directory, 
+                  'repository_status' => repository_status
+                  })
+                  LOG.info "Uploaded data result from upload is #{res.body.strip}"
+                end
             rescue
-              puts "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-              puts "Error Running on #{repository_directory}"
-              puts "#{$!}"
-              puts "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+              LOG.error "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+              LOG.error "Error Running on #{repository_directory}"
+              LOG.error "#{$!}"
+              LOG.error "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
             end
           end
         else
@@ -200,6 +233,7 @@ class HostedChecker
     end
   end
 
+  # This is the old single threaded code
   # def process_command      
   #   Dir.new(@base_path).each do | z |
   #     # This doesn't work on Windows but who cares? We only host on Unix
