@@ -209,9 +209,9 @@ class HostedChecker
             begin
               repo = Repository.new(:base_path => repository_directory, :verbose => @options.verbose)
               repo.check
-              repository_status = repo.get_repository_data_as_yaml
               # Upload the repository data to the main database if required
               if @options.uploadurl
+                repository_status = repo.get_repository_data_as_yaml
                 res = Net::HTTP.post_form(URI.parse(@options.uploadurl), 
                 { 'hostname'=> @hostname, 
                   'repository_directory' => repository_directory, 

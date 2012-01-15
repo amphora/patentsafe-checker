@@ -633,6 +633,18 @@ class Repository
     LOG.info "** signatures validated"
   end
 
+  # Return the repository data as YAML
+  def get_repository_data_as_yaml
+    repository_data = {
+      :repository => self,
+      :documents => @docs,
+      :signatures => @sigs
+    }
+    data_as_yaml = YAML::dump(repository_data)
+    return data_as_yaml
+  end
+
+
   private
 
     def generate_output_files
@@ -642,16 +654,6 @@ class Repository
       write_formatted_file(@sigfile, @format, Signature.columns, @sigs) if @sigfile
     end
     
-    # Return the repository data as YAML
-    def get_repository_data_as_yaml
-      repository_data = {
-        :repository => self,
-        :documents => @docs,
-        :signatures => @sigs
-      }
-      data_as_yaml = YAML::dump(repository_data)
-      return data_as_yaml
-    end
 
     def write_formatted_file(path, format, columns, data)
       File.open(path, "w+") do |f|
