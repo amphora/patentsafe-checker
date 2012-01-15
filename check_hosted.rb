@@ -212,11 +212,14 @@ class HostedChecker
               # Upload the repository data to the main database if required
               if @options.uploadurl
                 repository_status = repo.get_repository_data_as_yaml
+                puts "Uploading data"
+                puts repository_status
                 res = Net::HTTP.post_form(URI.parse(@options.uploadurl), 
                 { 'hostname'=> @hostname, 
                   'repository_directory' => repository_directory, 
                   'repository_status' => repository_status
                   })
+                  puts "Uploaded data result from upload is #{res.body.strip}"
                   LOG.info "Uploaded data result from upload is #{res.body.strip}"
                 end
             rescue
