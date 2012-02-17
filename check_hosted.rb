@@ -213,7 +213,7 @@ class HostedChecker
               if @options.uploadurl
                 repository_status = repo.get_repository_data_as_yaml
                 puts "Uploading data"
-                puts repository_status
+                # puts repository_status
                 res = Net::HTTP.post_form(URI.parse(@options.uploadurl), 
                 { 'hostname'=> @hostname, 
                   'repository_directory' => repository_directory, 
