@@ -653,7 +653,7 @@ class Repository
       write_formatted_file(@docfile, @format, Document.columns, @docs) if @docfile
       write_formatted_file(@sigfile, @format, Signature.columns, @sigs) if @sigfile
     end
-    
+
 
     def write_formatted_file(path, format, columns, data)
       File.open(path, "w+") do |f|
@@ -1192,6 +1192,15 @@ class String
     RUBY_PLATFORM =~ /win32/i ? self.gsub!(/\\|\\\\/,"/") : self
   end
 
+end
+
+
+# Patch REXML for thread safety
+module REXML::Encoding
+  @mutex = Mutex.new
+  def self.apply(obj, enc)
+    @mutex.synchronize { @encoding_methods[enc][obj] }
+  end
 end
 
 
