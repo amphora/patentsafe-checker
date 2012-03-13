@@ -154,7 +154,7 @@ class HostedChecker
   # If there is, run against it
   def process_command
     # Create a queue of the Paths we want to check. Queue's are threadsafe arrays for our purposes.
-    Dir.new(@base_path).entries.each{ |d| @queue << d }
+    Dir.new(@base_path).entries.each { |d| @queue << d }
 
     # Get the hostname in case we need to submit to the repository monitor
     @hostname = %x{hostname -s}.strip
@@ -166,10 +166,10 @@ class HostedChecker
     end
 
     LOG.info "Threads runnning:"
-    Thread.list.each {|thr| p thr }
-    # And wait on them to terminate
-    threads.each { |aThread|  aThread.join }
+    Thread.list.each { |thread| puts "Thread #{thread.object_id} has started." }
 
+    # And wait on them to terminate
+    threads.each { |thread| thread.join }
   end
 
   def checker_worker
