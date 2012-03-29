@@ -1196,12 +1196,12 @@ end
 
 
 # Patch REXML for thread safety
-module REXML::Encoding
-  @mutex = Mutex.new
-  def self.apply(obj, enc)
-    @mutex.synchronize { @encoding_methods[enc][obj] }
-  end
-end
+# module REXML::Encoding
+#   @mutex = Mutex.new
+#   def self.apply(obj, enc)
+#     @mutex.synchronize { @encoding_methods[enc][obj] }
+#   end
+# end
 
 
 # Only run the app if this was called from the command line rather than included as a library
