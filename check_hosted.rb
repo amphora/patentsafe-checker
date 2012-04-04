@@ -24,7 +24,7 @@
 #   Amphora Research Systems, Ltd.
 #
 # == Copyright
-#   Copyright (c) 2006-2009 Amphora Research Systems Ltd.
+#   Copyright (c) 2006-2012 Amphora Research Systems Ltd.
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
 #   the Free Software Foundation, either version 3 of the License, or
@@ -214,6 +214,7 @@ class HostedChecker
                 repository_status = repo.get_repository_data_as_yaml
                 puts "Uploading data"
                 # puts repository_status
+                # TODO This needs to handle https
                 res = Net::HTTP.post_form(URI.parse(@options.uploadurl), 
                 { 'hostname'=> @hostname, 
                   'repository_directory' => repository_directory, 
