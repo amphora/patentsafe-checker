@@ -1,18 +1,18 @@
-#!/usr/bin/env ruby 
+#!/usr/bin/env ruby
 #
-# == Synopsis 
+# == Synopsis
 #   Script to scan the PatentSafe document repository checking for
-#   document and signature validity. Mainly intended for Amphora's 
+#   document and signature validity. Mainly intended for Amphora's
 #   Hosted PatentSafe servers (and their backup). Produces no output
 #   unless there is a problem, so can be run from cron
 #
 # == Examples
-#   
+#
 #     ruby check_hosted.rb /base/dir path/suffix
 #
 #     On Duane run "ruby check_hosted.rb /zones root/export/home/apps/patentsafe" as root
 #
-# == Usage 
+# == Usage
 #   check_hosted.rb [options] base_directory path_inside_each_hit
 #
 #   For help use: ruby check_hosted.rb -h
@@ -29,20 +29,20 @@
 #   it under the terms of the GNU General Public License as published by
 #   the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
-# 
+#
 #   This program is distributed in the hope that it will be useful,
 #   but WITHOUT ANY WARRANTY; without even the implied warranty of
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
-# 
+#
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Things we need to process command line arguments
-require 'optparse' 
+require 'optparse'
 require 'ostruct'
 
-# The Repository checker 
+# The Repository checker
 require "./pscheck"
 
 # For Threading
@@ -51,7 +51,7 @@ require 'thread'
 # This is for controlling processes
 require 'open3'
 
-# HTTP stuff 
+# HTTP stuff
 require 'net/http'
 require 'uri'
 
@@ -74,11 +74,12 @@ class HostedChecker
 
     # set defaults
     @options = OpenStruct.new
+    @queue = Queue.new # threadsafe array basically
   end
 
   # Parse options, check arguments, then process the command
   def run
-    if parsed_options? && arguments_valid? 
+    if parsed_options? && arguments_valid?
       if @options.verbose
         LOG.level = Logger::INFO
       elsif @options.quiet
@@ -87,7 +88,7 @@ class HostedChecker
         # The default is WARN
         LOG.level = Logger::WARN
       end
-      
+
       # arguments then the pscheck command itself
       process_arguments
       process_command
@@ -101,31 +102,31 @@ class HostedChecker
 
   def parsed_options?
     # specify options
-    opts = OptionParser.new 
+    opts = OptionParser.new
     opts.on('-h', '--help')        { output_help }
     opts.on('-V', '--verbose')     { @options.verbose = true }
     opts.on('-u', '--upload [uploadurl]')      { |uploadurl| @options.uploadurl = uploadurl }
     opts.parse!(@arguments) rescue return false
     process_options
-    true      
+    true
   end
 
   # Performs post-parse processing on options
   def process_options
-    @options.verbose = false if @options.quiet      
+    @options.verbose = false if @options.quiet
   end
 
   def output_options
     puts "Options:\n"
 
-    @options.marshal_dump.each do |name, val|        
+    @options.marshal_dump.each do |name, val|
       puts "  #{name} = #{val}"
     end
   end
 
   # True if required arguments were provided
   def arguments_valid?
-    true if @arguments.length == 2 
+    true if @arguments.length == 2
   end
 
   # Setup the arguments
@@ -151,11 +152,10 @@ class HostedChecker
   # This is where the Script actually does something
   # Get all the directories in base_path and see if there's something in path_suffix
   # If there is, run against it
-  def process_command 
-    # Create an array of the Paths we want to check - global variable so the worker function can see it
-    $to_check = Dir.new(@base_path).entries
-    # And a Mutex to control access to this so the threads don't trip over each other - global variable so the worker function can see it
-    $to_check_mutex = Mutex.new
+  def process_command
+    # Create a queue of the Paths we want to check. Queue's are threadsafe arrays for our purposes.
+    # Skip dot directories
+    Dir.new(@base_path).entries.each { |d| @queue << d unless d[0..0] == "." }
 
     # Get the hostname in case we need to submit to the repository monitor
     @hostname = %x{hostname -s}.strip
@@ -167,23 +167,30 @@ class HostedChecker
     end
 
     LOG.info "Threads runnning:"
-    Thread.list.each {|thr| p thr }
-    # And wait on them to terminate
-    threads.each { |aThread|  aThread.join }
+    Thread.list.each { |thread| puts "Thread #{thread.object_id} has started." }
 
-  end   
+    # And wait on them to terminate
+    threads.each { |thread| thread.join }
+  end
 
   def checker_worker
     LOG.info "Checker worker started #{Thread.current.to_s}"
-    done = false
     z = ""
-    until done do
-      # Get exclusive access to the $to_check array
-      $to_check_mutex.synchronize do
-        # If there's nothing there then we can stop
-        if $to_check.size == 0
-          done = true
-          LOG.info "Nothing else to do so quitting"
+
+    until @queue.empty? do
+      z = @queue.pop # get the next block of work (directory)
+
+      LOG.info "Working on #{z}"
+
+      puts "Checker worker running on #{z} remaining=#{@queue.size} thread=#{Thread.current.to_s}"
+
+      # Run the checker
+      repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
+      if File.exists?(repository_directory)
+        if File.exists?("#{repository_directory}/disable_checker")
+          LOG.info "========================================================================================================================"
+          LOG.info "Not Running on #{repository_directory} because disable_checker is present"
+          LOG.info "========================================================================================================================"
         else
           # Get a value to play with and remove from the array
           z = $to_check.delete_at(0)
@@ -230,15 +237,19 @@ class HostedChecker
               LOG.error "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
             end
           end
-        else
-          LOG.info "**** No directory #{repository_directory}"
         end
+      else
+        LOG.info "**** No directory #{repository_directory}"
       end
-    end
+
+    end # queue loop
+
+    LOG.info "Nothing else to do so quitting"
+
   end
 
   # This is the old single threaded code
-  # def process_command      
+  # def process_command
   #   Dir.new(@base_path).each do | z |
   #     # This doesn't work on Windows but who cares? We only host on Unix
   #     repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
@@ -257,9 +268,9 @@ class HostedChecker
   #     else
   #       LOG.info "**** No directory #{repository_directory}"
   #     end
-  # 
+  #
   #   end
-  # end    
+  # end
 
 end
 
