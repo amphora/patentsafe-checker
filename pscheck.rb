@@ -240,7 +240,6 @@ class App
     # Performs post-parse processing on options
     def process_options
       @options.verbose = false if @options.quiet
-      @options.format ||= 'csv'
 
       if @options.exceptions_path
         # check if file passed in on -x is there
@@ -428,7 +427,8 @@ class Repository
     @check_finished_at = DateTime.now
     LOG.info "\nPatentSafe Check Finished at #{@check_finished_at}"
 
-    generate_output_files
+    # Only produce the output files if required
+    generate_output_files if @format
     generate_summary_report
   end
 
