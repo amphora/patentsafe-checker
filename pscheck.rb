@@ -24,10 +24,7 @@
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Verbose output
 #   -y, --year          Only scan year given
-#   -r, --repofile      Filename to output repository information
-#   -d, --docfile       Filename to output list of documents
-#   -s, --sigfile       Filename to output list of signatures
-#   -c, --csv           Output docfile/sigfile in csv format [Default]
+#   -c, --csv           Output docfile/sigfile in csv format
 #   -j, --json          Output docfile/sigfile in json format
 #   -x, --exceptions    Path to file with a list of known exceptions
 #
@@ -168,6 +165,7 @@ require 'rexml/document'
 require 'time'
 require 'yaml'
 require 'rubygems'
+require 'date'
 
 # setup the logger if this is the main file
 if __FILE__ == $PROGRAM_NAME
@@ -182,7 +180,7 @@ end
 # To see what is really happening - jump to the process_command method
 #
 class App
-  VERSION = '5.4-dev'
+  VERSION = '5.5'
 
   attr_reader :options
 
@@ -230,9 +228,6 @@ class App
       opts.on('-V', '--verbose')             { @options.verbose = true }
       opts.on('-q', '--quiet')               { @options.quiet = true }
       opts.on('-y', '--year [yyyy]')         { |yyyy| @options.year = yyyy }
-      opts.on('-r', '--repofile [repofilename]') { |repofilename| @options.repofile = repofilename }
-      opts.on('-d', '--docfile [docfilename]')  { |docfilename| @options.docfile = docfilename }
-      opts.on('-s', '--sigfile [sigfilename]')  { |sigfilename| @options.sigfile = sigfilename }
       opts.on('-c', '--csv')                 { @options.format = 'csv' }
       opts.on('-j', '--json')                { @options.format = 'json' }
       opts.on('-x', '--exceptions [expath]') { |expath| @options.exceptions_path = expath }
@@ -534,7 +529,7 @@ class Repository
                                  :verbose => @verbose)
       rescue REXML::ParseException => e
         @results.corrupt_documents += 1
-        @results.checked_documents +=1
+        @results.checked_documents += 1
         # move on to the next document
         next
       end
@@ -648,10 +643,16 @@ class Repository
   private
 
     def generate_output_files
-      # overwrite old files
-      write_formatted_file(@repofile, @format, Repository.columns, [self.to_row]) if @repofile
-      write_formatted_file(@docfile, @format, Document.columns, @docs) if @docfile
-      write_formatted_file(@sigfile, @format, Signature.columns, @sigs) if @sigfile
+      # Generate some sensible filenames for the reports
+      timestamp = "#{DateTime.now.strftime('%Y-%m-%d_%H-%M-%S')}"      
+      @repofile = "Repo-#{timestamp}.#{@format}"
+      @docfile = "Docs-#{timestamp}.#{@format}"
+      @sigfile = "Sigs-#{timestamp}.#{@format}"
+      
+      # Note this will overwrite old files
+      write_formatted_file(@repofile, @format, Repository.columns, [self.to_row])
+      write_formatted_file(@docfile, @format, Document.columns, @docs)
+      write_formatted_file(@sigfile, @format, Signature.columns, @sigs)
     end
     
 
@@ -832,7 +833,7 @@ class Document
   end
 
   def to_row
-    [document_id, hash]
+    [document_id, hash, document_type, content_name, path]
   end
 
   def content_path
@@ -952,7 +953,7 @@ class Signature
   end
 
   def to_row
-    [signature_id, value]
+    [signature_id, document_id, role, signer_id, signer_name, public_key, content_filename, content_hash, wording, date,text, value]
   end
 
   def signed_content_path
