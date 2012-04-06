@@ -1,5 +1,9 @@
 .DS_Store
 doc/api
 doc/app
-.redcar
 test/tmp
+
+Repo-*
+Docs-*
+Sigs-*
+
