@@ -23,6 +23,7 @@
 #   -v, --version       Display the version, then exit
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Verbose output
+#   -s, --skip          Skip document and signature validation
 #   -y, --year          Only scan year given
 #   -c, --csv           Output docfile/sigfile in csv format
 #   -j, --json          Output docfile/sigfile in json format
@@ -226,6 +227,7 @@ class App
       opts.on('-v', '--version')             { output_version ; exit 0 }
       opts.on('-h', '--help')                { output_help }
       opts.on('-V', '--verbose')             { @options.verbose = true }
+      opts.on('-s', '--skip')                { @options.skip = true }
       opts.on('-q', '--quiet')               { @options.quiet = true }
       opts.on('-y', '--year [yyyy]')         { |yyyy| @options.year = yyyy }
       opts.on('-c', '--csv')                 { @options.format = 'csv' }
@@ -309,6 +311,7 @@ class App
                             :year => @options.year,
                             :known_exceptions => @known_exceptions,
                             :verbose => @options.verbose,
+                            :skip_validation => @options.skip,
                             :repofile => @options.repofile,
                             :docfile => @options.docfile,
                             :sigfile => @options.sigfile,
@@ -332,6 +335,7 @@ class Repository
     @year = options[:year]
     @known_exceptions = options[:known_exceptions] || {}
     @verbose = options[:verbose] || false
+    @skip_validation = options[:skip_validation]
     @repofile = options[:repofile]
     @docfile = options[:docfile]
     @sigfile = options[:sigfile]
@@ -520,7 +524,7 @@ class Repository
   # Loads and validates documents from the xml in the repo
   def validate_documents
     LOG.info ""
-    LOG.info "** validating documents"
+    LOG.info "** checking #{'and validating' unless @skip_validation} documents"
 
     Dir["#{check_path}/**/docinfo.xml"].each do |path|
       begin
@@ -546,7 +550,7 @@ class Repository
         LOG.info "  - SKIPPED: Known exception [#{exception_comment}]" if exception_comment
       else
         # perform validation
-        doc_errors = document.validate
+        doc_errors = document.validate unless @skip_validation
 
         # did the doc have a hash?
         @results.nohash_documents += 1 unless document.hash_exists?
@@ -556,7 +560,7 @@ class Repository
         @docs <<  document.to_row if @docfile
 
         # tally errors here to save time
-        unless doc_errors.empty?
+        if doc_errors && !doc_errors.empty?
           @results.errors[document.document_id] = doc_errors
           @results.missing_documents        += 1 if doc_errors[:content_missing]
           @results.invalid_document_hashes  += 1 if doc_errors[:invalid_document_hash]
@@ -567,13 +571,13 @@ class Repository
     end
 
     LOG.info ""
-    LOG.info "** documents validated"
+    LOG.info "** documents checked #{'and validated' unless @skip_validation}"
   end
 
   # Loads and validates signatures from the xml in the repo
   def validate_signatures
     LOG.info ""
-    LOG.info "** validating signatures"
+    LOG.info "** checking #{'and validating' unless @skip_validation} signatures"
 
     Dir["#{check_path}/**/signature-*.xml"].each do |path|
       begin
@@ -598,15 +602,17 @@ class Repository
 
         LOG.info "  - SKIPPED: Known exception [#{exception_comment}]" if exception_comment
       else
-        # perform validation
-        sig_errors = signature.validate
+        unless @skip_validation
+          # perform validation
+          sig_errors = signature.validate
 
-        # check if user public key can be found
-        if @users[signature.signer_id] && @users[signature.signer_id].keys.include?(signature.public_key)
-          LOG.info "  - OK:  User public key is consistent with database"
-        else
-          LOG.error "  - ERROR: #{signature.signature_id unless @verbose} User public key not found (this may not be a problem - make sure you can find the identity certificate)"
-          sig_errors[:missing_key] = {signature.public_key => signature.signer_id}
+          # check if user public key can be found
+          if @users[signature.signer_id] && @users[signature.signer_id].keys.include?(signature.public_key)
+            LOG.info "  - OK:  User public key is consistent with database"
+          else
+            LOG.error "  - ERROR: #{signature.signature_id unless @verbose} User public key not found (this may not be a problem - make sure you can find the identity certificate)"
+            sig_errors[:missing_key] = {signature.public_key => signature.signer_id}
+          end
         end
 
         @results.checked_signatures += 1
@@ -614,7 +620,7 @@ class Repository
         @sigs <<  signature.to_row if @sigfile
 
         # tally errors here to save time
-        unless sig_errors.empty?
+        if sig_errors && !sig_errors.empty?
           @results.errors[signature.signature_id] = sig_errors
           @results.missing_keys             += 1 if sig_errors[:missing_key]
           @results.invalid_signature_texts  += 1 if sig_errors[:invalid_signature_text]
@@ -626,7 +632,7 @@ class Repository
     end
 
     LOG.info ""
-    LOG.info "** signatures validated"
+    LOG.info "** signatures checked #{'and validated' unless @skip_validation}"
   end
 
   # Return the repository data as YAML
@@ -700,11 +706,11 @@ class Repository
       end
       LOG.warn "-- Successful checks --"
       LOG.warn " Documents w/o hash:        #{@results.nohash_documents}" if @results.nohash_documents > 0
-      LOG.warn " Document hashes:           #{dtotal - @results.invalid_document_hashes - @results.nohash_documents}" if openssl_sha512?
+      LOG.warn " Document hashes:           #{dtotal - @results.invalid_document_hashes - @results.nohash_documents}" if !@skip_validation && openssl_sha512?
       LOG.warn " Public keys found:         #{stotal - @results.missing_keys}"
       LOG.warn " Signature texts:           #{stotal - @results.invalid_signature_texts}"
-      LOG.warn " Content hashes:            #{stotal - @results.invalid_content_hashes}" if openssl_sha512?
-      LOG.warn " Valid signatures:          #{stotal - @results.invalid_signatures}" if openssl_sha512?
+      LOG.warn " Content hashes:            #{stotal - @results.invalid_content_hashes}" if !@skip_validation && openssl_sha512?
+      LOG.warn " Valid signatures:          #{stotal - @results.invalid_signatures}" if !@skip_validation && openssl_sha512?
       LOG.warn ""
       LOG.fatal "  * Hashes and public_keys could not be validated as the installed " unless openssl_sha512?
       LOG.fatal "    version of OpenSSL does not support SHA512." unless openssl_sha512?
