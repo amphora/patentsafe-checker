@@ -400,7 +400,7 @@ class Repository
 
   # Performs the checks on the repository
   def check
-    @check_started_at = DateTime.now
+    @check_started_at = Time.now
     LOG.info "PatentSafe Check Start at #{@check_started_at}\n"
 
     unless openssl_sha512?
@@ -424,9 +424,10 @@ class Repository
     validate_documents
     validate_signatures
 
-    @check_finished_at = DateTime.now
+    @check_finished_at = Time.now
+    @check_run_minutes = "%.3f" % ((@check_finished_at - @check_started_at)/60).to_s
     LOG.info "\nPatentSafe Check Finished at #{@check_finished_at}"
-
+    LOG.info "\nPatentSafe Check Finished in #{@check_run_minutes} minutes"
     # Only produce the output files if required
     generate_output_files if @format
     generate_summary_report
@@ -644,11 +645,11 @@ class Repository
 
     def generate_output_files
       # Generate some sensible filenames for the reports
-      timestamp = "#{DateTime.now.strftime('%Y-%m-%d_%H-%M-%S')}"      
+      timestamp = "#{DateTime.now.strftime('%Y-%m-%d_%H-%M-%S')}"
       @repofile = "Repo-#{timestamp}.#{@format}"
       @docfile = "Docs-#{timestamp}.#{@format}"
       @sigfile = "Sigs-#{timestamp}.#{@format}"
-      
+
       # Note this will overwrite old files
       write_formatted_file(@repofile, @format, Repository.columns, [self.to_row])
       write_formatted_file(@docfile, @format, Document.columns, @docs)
@@ -671,6 +672,7 @@ class Repository
       LOG.warn "PatentSafe Checker Summary Report for #{@path}"
       LOG.warn "-----------------------------------------------------------------------"
       LOG.warn "Run at:                     #{@check_started_at}"
+      LOG.warn "Run time:                   #{@check_run_minutes} minutes"
       LOG.warn ""
       LOG.warn "Document packets checked:   #{dtotal}"
       LOG.warn "Signature packets checked:  #{stotal}#{'*' unless openssl_sha512?}"
