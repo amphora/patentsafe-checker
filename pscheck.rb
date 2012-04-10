@@ -314,8 +314,6 @@ class App
         :verbose          => @options.verbose,
         :skip_validation  => @options.skip,
         :repofile         => @options.repofile,
-        :docfile          => @options.docfile,
-        :sigfile          => @options.sigfile,
         :format           => @options.format
       )
 
@@ -340,12 +338,16 @@ class Repository
     @verbose          = options[:verbose] || false
     @skip_validation  = options[:skip_validation]
     @repofile         = options[:repofile]
-    @docfile          = options[:docfile]
-    @sigfile          = options[:sigfile]
     @format           = options[:format]
     @users            = Hash.new
     @docs             = Array.new
     @sigs             = Array.new
+
+    # Generate some sensible filenames for the reports
+    timestamp = "#{Time.now.strftime('%Y-%m-%d_%H-%M-%S')}"
+    @repofile = "repo-#{timestamp}.#{@format}"
+    @docfile  = "docs-#{timestamp}.#{@format}"
+    @sigfile  = "sigs-#{timestamp}.#{@format}"
 
     # results storage
     @results                          = OpenStruct.new
@@ -659,12 +661,6 @@ class Repository
   private
 
     def generate_output_files
-      # Generate some sensible filenames for the reports
-      timestamp = "#{DateTime.now.strftime('%Y-%m-%d_%H-%M-%S')}"
-      @repofile = "Repo-#{timestamp}.#{@format}"
-      @docfile  = "Docs-#{timestamp}.#{@format}"
-      @sigfile  = "Sigs-#{timestamp}.#{@format}"
-
       # Note this will overwrite old files
       write_formatted_file(@repofile, @format, Repository.columns, [self.to_row])
       write_formatted_file(@docfile, @format, Document.columns, @docs)
