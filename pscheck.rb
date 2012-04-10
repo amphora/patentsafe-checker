@@ -726,21 +726,53 @@ class Repository
 end
 
 
+module RepositoryXML
+  attr_accessor :verbose, :path, :content, :xml
+
+  def exists?
+    File.exists?(@path)
+  end
+
+  def parsed?
+    @xml.nil? ? false : true
+  end
+
+  def extract(options)
+    @path     = options[:path]
+    @verbose  = options[:verbose] || false
+    @content  = options[:content]
+  end
+
+  # Parse an XML document
+  def parse_xml
+    @xml = File.exists?(@path) ? REXML::Document.new(File.read(@path)) : nil
+  end
+
+  # Parse a fragment of XML
+  def parse_content
+    @xml = REXML::Document.new("<root>\n#{@content}\n</root>") if @content
+  rescue REXML::ParseException => pe
+    LOG.error "There was a problem parsing #{@path}"
+    nil
+  end
+end
+
+
 # Config is a wrapper around the config xml document
 class Configuration
-  attr_accessor :verbose, :path, :xml
+  include RepositoryXML
+
   attr_reader :server_id, :customer_id, :installation_id
 
   def initialize(options={})
-    # path, verbose=false
-    @path = options[:path]
-    @verbose = options[:verbose] || false
+    extract options
 
-    @xml = REXML::Document.new(File.read(@path))
-    _server_id = @xml.root.elements["ServerId"]
-    @customer_id = _server_id.get_text("CustomerId").value().to_s
-    @installation_id = _server_id.get_text("InstallationId").value().to_s
-    @server_id = "#{@customer_id}#{@installation_id}"
+    if parse_xml
+      _server_id        = @xml.root.elements["ServerId"]
+      @customer_id      = _server_id.get_text("CustomerId").value().to_s
+      @installation_id  = _server_id.get_text("InstallationId").value().to_s
+      @server_id        = "#{@customer_id}#{@installation_id}"
+    end
   end
 
 end
@@ -748,18 +780,19 @@ end
 
 # IdValues is a wrapper around the id-values xml document
 class IdValues
-  attr_accessor :verbose, :path, :xml
+  include RepositoryXML
+
   attr_reader :ids
 
   def initialize(options={})
-    # path, verbose=false
-    @path = options[:path]
-    @verbose = options[:verbose] || false
+    extract options
+
     @ids = {}
 
-    @xml = REXML::Document.new(File.read(@path))
-    @xml.root.elements.each("id-value") do |id|
-      @ids[id.attribute("serverId").to_s] = id.attribute("count").to_s
+    if parse_xml
+      @xml.root.elements.each("id-value") do |id|
+        @ids[id.attribute("serverId").to_s] = id.attribute("count").to_s
+      end
     end
   end
 
@@ -768,24 +801,23 @@ end
 
 # User is a wrapper around the user xml document
 class User
-  attr_accessor :verbose, :path, :xml
+  include RepositoryXML
+
   attr_reader :version, :user_id, :name, :keys
 
   def initialize(options={})
-    # path, verbose=false
-    @path = options[:path]
-    @verbose = options[:verbose] || false
+    extract options
 
     @keys = Array.new
 
-    if @path
-      @xml = REXML::Document.new(File.read(@path))
-      # load the document on initialize "eagerly"
-      @version = @xml.root.attribute("version").to_s
-      @user_id = @xml.root.attribute("userId").to_s
-      @name = @xml.root.get_text("name").value().to_s
-      key = @xml.root.elements["keyPair"]
+    if @path && parse_xml
+      @version  = @xml.root.attribute("version").to_s
+      @user_id  = @xml.root.attribute("userId").to_s
+      @name     = @xml.root.get_text("name").value().to_s
+      key       = @xml.root.elements["keyPair"]
+
       @keys << key.get_text("encodedKey").value().to_s if key
+
       # load old keys too
       keys_path = File.join(File.split(@path)[0], "#{@user_id.downcase}.keys")
 
@@ -805,39 +837,40 @@ end
 
 # Document is a wrapper around the document xml document
 class Document
-  attr_accessor :verbose, :path, :xml
+  include RepositoryXML
+
   # document attributes
   attr_reader :document_id, :document_type, :content_name, :hash, :signature_ids, :signature_paths
 
   def initialize(options={})
-    # path, sha512=false, verbose=false
-    @path = options[:path]
-    @verbose = options[:verbose] || false
+    extract options
 
     @sha512 = options[:sha512] || false
     @errors = Hash.new
-    if @path
-      @xml = REXML::Document.new(File.open(path))
-      root = @xml.root
-      @document_id = root.attribute("docId").to_s
-      @document_type = root.attribute("type").to_s
-      cn = root.elements["content/name"]
-      @content_name = cn ? cn.text : "UNKNOWN"
-      h = root.elements["hash[@format='sha512']"]
+
+    if @path && parse_xml
+      root            = @xml.root
+      @document_id    = root.attribute("docId").to_s
+      @document_type  = root.attribute("type").to_s
+      cn              = root.elements["content/name"]
+      @content_name   = cn ? cn.text : "UNKNOWN"
+      h               = root.elements["hash[@format='sha512']"]
+
       if h
-        @hash_exists = true
-        @hash = h.text.to_s
+        @hash_exists  = true
+        @hash         = h.text.to_s
       else
-        @hash_exists = false
-        @hash = nil
+        @hash_exists  = false
+        @hash         = nil
       end
+
       # signature_ids is an array of ids for signatures that have a state of "Signed"
-      @signature_ids = []
+      @signature_ids  = []
       root.get_elements("signatures/signature").each{ |s| @signature_ids << s.attribute("sigId").to_s if s.get_text("state").value().to_s.downcase == "signed" }
 
-      pn = Pathname.new(path)
+      pn                = Pathname.new(path)
       # trim signature id to get the file suffix: TEST0100000037S001 (last 3 digits)
-      @signature_paths = @signature_ids.map{ |sid| File.join(pn.dirname,"signature-#{sid[15..17]}.xml") }
+      @signature_paths  = @signature_ids.map{ |sid| File.join(pn.dirname,"signature-#{sid[15..17]}.xml") }
     end
 
   end
@@ -909,6 +942,7 @@ class Document
     # test if signature files are on disk
     signature_paths.inject(false) do |exists, path|
       sig_exists = File.exists?(path)
+
       if sig_exists
         LOG.info "  - OK:  Document signature found at #{path}"
       else
@@ -931,34 +965,33 @@ end
 
 # Signature is a wrapper around the signature xml document
 class Signature
-  attr_accessor :verbose, :path, :xml
+  include RepositoryXML
+
   # signer attributes
   attr_reader :signer_id, :signer_name, :public_key, :role
   # signature attributes
   attr_reader :signature_id, :document_id, :content_filename, :content_hash, :wording, :date, :text, :value
 
   def initialize(options={})
-    # path, sha512=false, verbose=false
-    @path = options[:path]
-    @verbose = options[:verbose] || false
+    extract options
 
     @sha512 = options[:sha512] || false
     @errors = Hash.new
-    if @path
-      @xml = REXML::Document.new(File.open(path))
-      root = @xml.root
-      @signature_id = root.attribute("sigId").to_s
-      @document_id = @signature_id[0..13] # first 13 characters
-      @signer_id = root.elements["signer"].attribute("userId").value()
-      @signer_name = root.get_text("signer").value()
-      @public_key = root.get_text("publicKey").value().to_s.strip
-      @role = root.get_text("role").value()
+
+    if @path && parse_xml
+      root              = @xml.root
+      @signature_id     = root.attribute("sigId").to_s
+      @document_id      = @signature_id[0..13] # first 13 characters
+      @signer_id        = root.elements["signer"].attribute("userId").value()
+      @signer_name      = root.get_text("signer").value()
+      @public_key       = root.get_text("publicKey").value().to_s.strip
+      @role             = root.get_text("role").value()
       @content_filename = root.elements["signedContent"].attribute("filename").value()
-      @content_hash = root.get_text("signedContent").value().to_s.strip
-      @wording = root.get_text("affirmedWording").value()
-      @date = root.get_text("signatureDate").value()
-      @text = root.get_text("signatureText").value()
-      @value= root.get_text("signatureValue").value()
+      @content_hash     = root.get_text("signedContent").value().to_s.strip
+      @wording          = root.get_text("affirmedWording").value()
+      @date             = root.get_text("signatureDate").value()
+      @text             = root.get_text("signatureText").value()
+      @value            = root.get_text("signatureValue").value()
     end
   end
 
@@ -1067,37 +1100,35 @@ end
 
 
 class Events
-  attr_accessor :verbose, :path, :file
+  include RepositoryXML
 
   def initialize(options={})
-    # path, verbose=false
-    @path = options[:path]
-    @verbose = options[:verbose] || false
+    extract options
   end
 
   def last
     last_line = ""
-    File.open(@path, 'r+'){ |f| f.each { |line| last_line = line } }
-    Event.new(:content => last_line, :verbose => @verbose)
+    File.open(@path, 'r+'){ |f| f.each { |line| last_line = line } } if exists?
+    Event.new(:path => @path, :content => last_line, :verbose => @verbose)
   end
 
 end
 
+
 class Event
-  attr_accessor :verbose, :content, :xml
+  include RepositoryXML
+
   # attributes we care about
   attr_accessor :event_type, :occurred_at, :occurred
 
   def initialize(options={})
-    @content = options[:content]
-    @verbose = options[:verbose] || false
+    extract options
 
-    if @content
-      @xml = REXML::Document.new("<root>\n#{@content}\n</root>")
+    if @content && parse_content
       if _event = @xml.root.elements["event"]
-        @event_type = _event.attribute("type").to_s
-        @occurred = _event.attribute("occured").to_s
-        @occurred_at = Time.parse(@occurred)
+        @event_type   = _event.attribute("type").to_s
+        @occurred     = _event.attribute("occured").to_s
+        @occurred_at  = Time.parse(@occurred)
       end
     end
   end
