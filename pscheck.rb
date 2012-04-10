@@ -644,11 +644,11 @@ class Repository
   def get_repository_data_as_yaml
     repository_data = {
       :repository => self,
-      :documents => @docs,
+      :documents  => @docs,
       :signatures => @sigs
     }
-    data_as_yaml = YAML::dump(repository_data)
-    return data_as_yaml
+
+    YAML::dump(repository_data)
   end
 
 
