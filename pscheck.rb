@@ -769,12 +769,21 @@ class Configuration
 
     if parse_xml
       _server_id        = @xml.root.elements["ServerId"]
-      @customer_id      = _server_id.get_text("CustomerId").value().to_s
-      @installation_id  = _server_id.get_text("InstallationId").value().to_s
+      # @customer_id      = _server_id.get_text("CustomerId").value().to_s
+      @customer_id      = get_text(_server_id, "CustomerId", "UNKNOWN")
+      # @installation_id  = _server_id.get_text("InstallationId").value().to_s
+      @installation_id  = get_text(_server_id, "InstallationId", "00")
       @server_id        = "#{@customer_id}#{@installation_id}"
     end
   end
 
+  def get_text(node, name, default)
+    if text = node.get_text(name)
+      text.value().to_s
+    else
+      default
+    end
+  end
 end
 
 
