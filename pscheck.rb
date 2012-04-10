@@ -307,15 +307,18 @@ class App
       LOG.info ""
       LOG.info version_text
       LOG.info "-----------------------------------------------------------------------"
-      repo = Repository.new(:base_path => @patentsafe_dir,
-                            :year => @options.year,
-                            :known_exceptions => @known_exceptions,
-                            :verbose => @options.verbose,
-                            :skip_validation => @options.skip,
-                            :repofile => @options.repofile,
-                            :docfile => @options.docfile,
-                            :sigfile => @options.sigfile,
-                            :format => @options.format)
+      repo = Repository.new(
+        :base_path        => @patentsafe_dir,
+        :year             => @options.year,
+        :known_exceptions => @known_exceptions,
+        :verbose          => @options.verbose,
+        :skip_validation  => @options.skip,
+        :repofile         => @options.repofile,
+        :docfile          => @options.docfile,
+        :sigfile          => @options.sigfile,
+        :format           => @options.format
+      )
+
       repo.check
     end
 
@@ -331,21 +334,23 @@ class Repository
 
   def initialize(options={})
     # base_path, year=nil, verbose=false
-    @path = options[:base_path]
-    @year = options[:year]
+    @path             = options[:base_path]
+    @year             = options[:year]
     @known_exceptions = options[:known_exceptions] || {}
-    @verbose = options[:verbose] || false
-    @skip_validation = options[:skip_validation]
-    @repofile = options[:repofile]
-    @docfile = options[:docfile]
-    @sigfile = options[:sigfile]
-    @format = options[:format]
-    @users = Hash.new
-    @docs = Array.new
-    @sigs = Array.new
+    @verbose          = options[:verbose] || false
+    @skip_validation  = options[:skip_validation]
+    @repofile         = options[:repofile]
+    @docfile          = options[:docfile]
+    @sigfile          = options[:sigfile]
+    @format           = options[:format]
+    @users            = Hash.new
+    @docs             = Array.new
+    @sigs             = Array.new
+
     # results storage
     @results                          = OpenStruct.new
     @results.errors                   = Hash.new
+
     # document info
     @results.missing_documents        = 0
     @results.corrupt_documents        = 0
@@ -355,6 +360,7 @@ class Repository
     @results.checked_documents        = 0
     @results.known_documents_skipped  = 0
     @results.missing_signatures       = 0
+
     # signature info
     @results.corrupt_signatures       = 0
     @results.missing_keys             = 0
@@ -413,9 +419,11 @@ class Repository
 
     unless @known_exceptions.empty?
       LOG.info "** known file exceptions list loaded (all signatures for these documents will be skipped)"
+
       @known_exceptions.each do |docid,comment|
         LOG.info " - #{docid}: #{comment}"
       end
+
       LOG.info ""
       LOG.info "** #{@known_exceptions.length} known file exceptions loaded"
       LOG.info ""
@@ -430,8 +438,10 @@ class Repository
 
     @check_finished_at = Time.now
     @check_run_minutes = "%.3f" % ((@check_finished_at - @check_started_at)/60).to_s
+
     LOG.info "\nPatentSafe Check Finished at #{@check_finished_at}"
     LOG.info "\nPatentSafe Check Finished in #{@check_run_minutes} minutes"
+
     # Only produce the output files if required
     generate_output_files if @format
     generate_summary_report
@@ -442,10 +452,10 @@ class Repository
     LOG.info ""
     LOG.info "** loading configuration from #{config_path}"
 
-    configuration = Configuration.new(:path => config_path, :verbose => @verbose)
-    @customer_id = configuration.customer_id
-    @installation_id = configuration.installation_id
-    @server_id = configuration.server_id
+    configuration     = Configuration.new(:path => config_path, :verbose => @verbose)
+    @customer_id      = configuration.customer_id
+    @installation_id  = configuration.installation_id
+    @server_id        = configuration.server_id
 
     LOG.info ""
     LOG.info "** configuration for #{@server_id} loaded"
@@ -455,9 +465,9 @@ class Repository
     LOG.info ""
     LOG.info "** loading id-values from #{id_values_path}"
 
-    id_values = IdValues.new(:path => id_values_path, :verbose => @verbose)
+    id_values       = IdValues.new(:path => id_values_path, :verbose => @verbose)
     @document_count = id_values.ids[@server_id]
-    @bit_count = id_values.ids["#{@customer_id}--"]
+    @bit_count      = id_values.ids["#{@customer_id}--"]
 
     LOG.info ""
     LOG.info "** id-values for #{@server_id} loaded"
@@ -493,8 +503,8 @@ class Repository
     end
     LOG.info " - log found at #{log_path}"
 
-    events = Events.new(:path => log_path, :verbose => @verbose)
-    last_event = events.last
+    events      = Events.new(:path => log_path, :verbose => @verbose)
+    last_event  = events.last
 
     LOG.info ""
     if last_event.occurred.nil?
@@ -511,8 +521,7 @@ class Repository
     LOG.info "** loading users from #{users_path}"
 
     Dir["#{users_path.to_pattern}/**/*.xml"].each do |path|
-      user = User.new(:path => path,
-                      :verbose => @verbose)
+      user = User.new(:path => path, :verbose => @verbose)
       # store it for use later
       @users[user.user_id] = user
     end
@@ -529,9 +538,7 @@ class Repository
     Dir["#{check_path}/**/docinfo.xml"].each do |path|
       begin
         # load the document
-        document = Document.new(:path => path,
-                                 :sha512 => openssl_sha512?,
-                                 :verbose => @verbose)
+        document = Document.new(:path => path, :sha512 => openssl_sha512?, :verbose => @verbose)
       rescue REXML::ParseException => e
         @results.corrupt_documents += 1
         @results.checked_documents += 1
@@ -582,9 +589,7 @@ class Repository
     Dir["#{check_path}/**/signature-*.xml"].each do |path|
       begin
         # load the signature
-        signature = Signature.new(:path => path,
-                                  :sha512 => openssl_sha512?,
-                                  :verbose => @verbose)
+        signature = Signature.new(:path => path, :sha512 => openssl_sha512?, :verbose => @verbose)
       rescue REXML::ParseException => e
         @results.corrupt_signatures += 1
         @results.checked_signatures +=1
@@ -653,8 +658,8 @@ class Repository
       # Generate some sensible filenames for the reports
       timestamp = "#{DateTime.now.strftime('%Y-%m-%d_%H-%M-%S')}"
       @repofile = "Repo-#{timestamp}.#{@format}"
-      @docfile = "Docs-#{timestamp}.#{@format}"
-      @sigfile = "Sigs-#{timestamp}.#{@format}"
+      @docfile  = "Docs-#{timestamp}.#{@format}"
+      @sigfile  = "Sigs-#{timestamp}.#{@format}"
 
       # Note this will overwrite old files
       write_formatted_file(@repofile, @format, Repository.columns, [self.to_row])
@@ -673,6 +678,7 @@ class Repository
     def generate_summary_report
       dtotal = @results.checked_documents
       stotal = @results.checked_signatures
+
       LOG.warn ""
       LOG.warn "-----------------------------------------------------------------------"
       LOG.warn "PatentSafe Checker Summary Report for #{@path}"
@@ -1117,10 +1123,10 @@ class Formatter
   end
 
   def format(columns, rows)
-    @columns = columns
-    @col_count = columns.length
-    @rows = rows
-    @row_count = rows.length
+    @columns    = columns
+    @col_count  = columns.length
+    @rows       = rows
+    @row_count  = rows.length
 
     out = ""
     out << header
