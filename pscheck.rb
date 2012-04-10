@@ -392,7 +392,11 @@ class Repository
   end
 
   def id_values_path
-    "#{data_path}"/'config'/'id-values.xml'
+    # Deal with older (4.x) id path
+    [ "#{data_path}"/'config'/'id-values.xml',
+      "#{data_path}"/'id-values.xml' ].find do |path|
+      File.exists?(path)
+    end
   end
 
   def data_path
