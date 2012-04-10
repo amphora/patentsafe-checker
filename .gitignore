@@ -3,6 +3,8 @@ doc/api
 doc/app
 test/tmp
 
+# output files
+output/
 Repo-*
 Docs-*
 Sigs-*

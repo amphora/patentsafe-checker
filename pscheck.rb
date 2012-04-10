@@ -157,6 +157,7 @@
 require 'base64'
 require 'date'
 require 'digest'
+require 'fileutils'
 require 'logger'
 require 'optparse'
 require 'openssl'
@@ -166,7 +167,6 @@ require 'rexml/document'
 require 'time'
 require 'yaml'
 require 'rubygems'
-require 'date'
 
 # setup the logger if this is the main file
 if __FILE__ == $PROGRAM_NAME
@@ -339,19 +339,18 @@ class Repository
     @skip_validation  = options[:skip_validation]
     @repofile         = options[:repofile]
     @format           = options[:format]
+
+    @repofile         = "repository.#{@format}"
+    @docfile          = "documents.#{@format}"
+    @sigfile          = "signatures.#{@format}"
+
     @users            = Hash.new
     @docs             = Array.new
     @sigs             = Array.new
 
-    # Generate some sensible filenames for the reports
-    timestamp = "#{Time.now.strftime('%Y-%m-%d_%H-%M-%S')}"
-    @repofile = "repo-#{timestamp}.#{@format}"
-    @docfile  = "docs-#{timestamp}.#{@format}"
-    @sigfile  = "sigs-#{timestamp}.#{@format}"
-
     # results storage
-    @results                          = OpenStruct.new
-    @results.errors                   = Hash.new
+    @results          = OpenStruct.new
+    @results.errors   = Hash.new
 
     # document info
     @results.missing_documents        = 0
@@ -387,6 +386,26 @@ class Repository
       "7bfa95a688924c47c7d22381f20cc926f524beacb13f84e203d4bd8cb6ba2fce81c57a5f059bf3d509926487bde925b3bcee0635e4f7baeba054e5dba696b2bf"
   rescue
     nil
+  end
+
+  def output_time
+    @check_started_at || Time.now
+  end
+
+  def output_path
+    @output_path ||= "output/#{@server_id}"/"#{output_time.strftime('%Y%m%d-%H%M%S')}"
+  end
+
+  def repofile_path
+    "#{output_path}"/@repofile
+  end
+
+  def docfile_path
+    "#{output_path}"/@docfile
+  end
+
+  def sigfile_path
+    "#{output_path}"/@sigfile
   end
 
   def config_path
@@ -661,10 +680,12 @@ class Repository
   private
 
     def generate_output_files
+      FileUtils.mkdir_p(output_path)
+
       # Note this will overwrite old files
-      write_formatted_file(@repofile, @format, Repository.columns, [self.to_row])
-      write_formatted_file(@docfile, @format, Document.columns, @docs)
-      write_formatted_file(@sigfile, @format, Signature.columns, @sigs)
+      write_formatted_file(repofile_path, @format, Repository.columns, [self.to_row])
+      write_formatted_file(docfile_path, @format, Document.columns, @docs)
+      write_formatted_file(sigfile_path, @format, Signature.columns, @sigs)
     end
 
 
