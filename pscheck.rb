@@ -751,7 +751,7 @@ module RepositoryXML
   attr_accessor :verbose, :path, :content, :xml
 
   def exists?
-    File.exists?(@path)
+    @path && File.exists?(@path)
   end
 
   def parsed?
