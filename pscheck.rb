@@ -277,6 +277,13 @@ class App
     # Setup the arguments
     def process_arguments
       @patentsafe_dir = ARGV[0] if ARGV[0]
+
+      # path must exist
+      unless File.exists?(@patentsafe_dir)
+        LOG.error "PatentSafe path #{@patentsafe_dir} does not exist!"
+        exit
+      end
+
     end
 
     def output_help
