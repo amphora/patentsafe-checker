@@ -1266,15 +1266,28 @@ class String
   def /(str_to_join)
     path = File.join(self, str_to_join)
     # if win32 switch / to \\
-    path.gsub!(File::SEPARATOR, File::ALT_SEPARATOR || File::SEPARATOR) if RUBY_PLATFORM =~ /win32/i
+    path.gsub!(File::SEPARATOR, File::ALT_SEPARATOR || File::SEPARATOR) if is_windows?
     path
   end
 
   # switches \\ or \ to / for dir pattern search
   def to_pattern
-    RUBY_PLATFORM =~ /win32/i ? self.gsub!(/\\|\\\\/,"/") : self
+    is_windows? ? self.gsub!(/\\|\\\\/,"/") : self
   end
 
+end
+
+
+
+# Use a variety of techniques to determine if we're on a Windows platform
+def is_windows?
+  return true if ENV['OS'] =~ /Windows/i 
+  return true if RUBY_PLATFORM =~ /win32/i 
+  return true if RUBY_PLATFORM =~ /mingw32/i 
+  return true if RUBY_PLATFORM =~ /mswin/i 
+  
+  # If we got this far, assume we're on something other than Windows
+  return false
 end
 
 
