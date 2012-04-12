@@ -916,8 +916,6 @@ class Document
     ["Document ID", "Hash"]
   end
 
-  # This is the row for the CSV
-  # Note if you change this, you need to change the relevant CSV parser in compare_repositories.rb
   def to_row
     [document_id, hash, document_type, content_name, path]
   end
