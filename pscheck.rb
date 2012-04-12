@@ -400,7 +400,7 @@ class Repository
   end
 
   def output_path
-    @output_path ||= "output/#{@server_id}"/"#{output_time.strftime('%Y%m%d-%H%M%S')}"
+    @output_path ||= "output"/"#{@server_id}"/"#{output_time.strftime('%Y%m%d-%H%M%S')}"
   end
 
   def repofile_path
