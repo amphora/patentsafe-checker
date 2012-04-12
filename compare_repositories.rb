@@ -170,16 +170,17 @@ class RepositoryComparer
       # The first entry is the key
       id = row[0]
       if !items.include?(id)
-        LOG.error "Error - when parsing looking for DocID #{id} in the first report, couldn't find it"
+        LOG.error "Error - when parsing looking for DocID #{id} in the first report, couldn't find it in the second"
       else
         # Check the two arrays of document details are the same
-        if items[id] != row
-          LOG.error "Error - The two reports for DocID #{id} are different"
-          LOG.error "  Copy 1 #{items[id].inspect}"
-          LOG.error "  Copy 2 #{row}.inspect"
-        else
+        if items[id] == row
+          LOG.info "DocID #{id} is identical - all OK"
           # Both copies are identical, so let's remove it from docs2
           items.delete(id)
+        else
+          LOG.error "Error - The two reports for DocID #{id} are different"
+          LOG.error "  Copy 1 #{items[id].inspect}"
+          LOG.error "  Copy 2 #{row.inspect}"
         end
       end
     end
