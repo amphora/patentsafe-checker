@@ -284,6 +284,8 @@ class App
         exit
       end
 
+      # It is useful to have the repository as a global variable
+      $repository_root = @patentsafe_dir
     end
 
     def output_help
@@ -885,6 +887,7 @@ class Document
     @sha512 = options[:sha512] || false
     @errors = Hash.new
 
+
     if @path && parse_xml
       root            = @xml.root
       @document_id    = root.attribute("docId").to_s
@@ -917,11 +920,17 @@ class Document
   end
 
   def to_row
-    [document_id, hash, document_type, content_name, path]
+    [document_id, hash, document_type, content_name, content_relative_path]
   end
 
+  # This is the absolute path
   def content_path
     File.dirname(path).to_s/content_name
+  end
+  
+  # This is the relative path - relative to the start of the repository
+  def content_relative_path
+    remove_repository_base(File.dirname(path).to_s/content_name)
   end
 
   def content_txt_path
@@ -1037,11 +1046,17 @@ class Signature
   end
 
   def to_row
-    [signature_id, document_id, role, signer_id, signer_name, public_key, content_filename, content_hash, wording, date,text, value]
+    [signature_id, document_id, role, signer_id, signer_name, public_key, signed_content_relative_path, content_hash, wording, date,text, value]
   end
 
+  # This is the absolute path
   def signed_content_path
     File.dirname(path).to_s/content_filename
+  end
+
+  # This is the relative path - relative to the start of the repository
+  def signed_content_relative_path
+    remove_repository_base(File.dirname(path).to_s/content_filename)
   end
 
   # Internally generated for comparison
@@ -1290,6 +1305,17 @@ def is_windows?
   return false
 end
 
+
+# Remove the Repository's base pathname from a path, so it becomes relative to the start of the Repository
+def remove_repository_base(pathname)
+  # Sometimes it might be nil or small 
+  if pathname == nil || pathname.size == 0
+    return pathname
+  else
+    # Just replace the repository root with nothing
+    return pathname.gsub($repository_root , "")
+  end
+end
 
 # Patch REXML for thread safety
 # module REXML::Encoding
