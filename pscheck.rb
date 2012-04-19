@@ -882,6 +882,9 @@ class Document
       root            = @xml.root
       @document_id    = root.attribute("docId").to_s
       @document_type  = root.attribute("type").to_s
+      if @document_type == 'digital'
+        @document_type = 'experiment'
+      end
       cn              = root.elements["content/name"]
       @content_name   = cn ? cn.text : "UNKNOWN"
       h               = root.elements["hash[@format='sha512']"]
