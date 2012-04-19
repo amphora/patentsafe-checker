@@ -464,7 +464,6 @@ class Repository
     end
 
     load_configuration
-    load_counts
     load_timestamp
     load_users
     validate_documents
@@ -493,18 +492,6 @@ class Repository
 
     LOG.info ""
     LOG.info "** configuration for #{@server_id} loaded"
-  end
-
-  def load_counts
-    LOG.info ""
-    LOG.info "** loading id-values from #{id_values_path}"
-
-    id_values       = IdValues.new(:path => id_values_path, :verbose => @verbose)
-    @document_count = id_values.ids[@server_id]
-    @bit_count      = id_values.ids["#{@customer_id}--"]
-
-    LOG.info ""
-    LOG.info "** id-values for #{@server_id} loaded"
   end
 
   # Loads last event from the repo as a "timestamp"
@@ -804,6 +791,9 @@ class Configuration
       # @installation_id  = _server_id.get_text("InstallationId").value().to_s
       @installation_id  = get_text(_server_id, "InstallationId", "00")
       @server_id        = "#{@customer_id}#{@installation_id}"
+    else
+      LOG.error "Unable to find configuration file: "+ @path
+      exit
     end
   end
 
@@ -927,7 +917,7 @@ class Document
   def content_path
     File.dirname(path).to_s/content_name
   end
-  
+
   # This is the relative path - relative to the start of the repository
   def content_relative_path
     remove_repository_base(File.dirname(path).to_s/content_name)
@@ -1296,11 +1286,11 @@ end
 
 # Use a variety of techniques to determine if we're on a Windows platform
 def is_windows?
-  return true if ENV['OS'] =~ /Windows/i 
-  return true if RUBY_PLATFORM =~ /win32/i 
-  return true if RUBY_PLATFORM =~ /mingw32/i 
-  return true if RUBY_PLATFORM =~ /mswin/i 
-  
+  return true if ENV['OS'] =~ /Windows/i
+  return true if RUBY_PLATFORM =~ /win32/i
+  return true if RUBY_PLATFORM =~ /mingw32/i
+  return true if RUBY_PLATFORM =~ /mswin/i
+
   # If we got this far, assume we're on something other than Windows
   return false
 end
@@ -1308,7 +1298,7 @@ end
 
 # Remove the Repository's base pathname from a path, so it becomes relative to the start of the Repository
 def remove_repository_base(pathname)
-  # Sometimes it might be nil or small 
+  # Sometimes it might be nil or small
   if pathname == nil || pathname.size == 0
     return pathname
   else
