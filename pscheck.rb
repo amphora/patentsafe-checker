@@ -572,7 +572,7 @@ class Repository
         @results.checked_documents += 1
 
         if @docfile
-          @doc_formatter ||= Formatter.new(output_path, @docfile, Document.columns, @format)          end
+          @doc_formatter ||= Formatter.new(output_path, @docfile, Document.columns, @format)
           @doc_formatter.format(document.to_row)
         end
 
