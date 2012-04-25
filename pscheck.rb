@@ -572,10 +572,10 @@ class Repository
         @results.checked_documents += 1
 
         if @docfile
-            if (!@docFormatter)
-                @docFormatter =  Formatter.new(output_path, @docfile, Document.columns, @format.to_s.downcase.to_sym)
-            end
-            @docFormatter.format(document.to_row)
+          if (!@docFormatter)
+            @docFormatter =  Formatter.new(output_path, @docfile, Document.columns, @format.to_s.downcase.to_sym)
+          end
+          @docFormatter.format(document.to_row)
         end
 
         # tally errors here to save time
@@ -636,10 +636,10 @@ class Repository
         # add the sig to the array if needed
         #@sigs <<  signature.to_row if @sigfile
         if @sigfile
-            if (!@sigFormatter)
-                @sigFormatter =  Formatter.new(output_path, @sigfile, Signature.columns, @format.to_s.downcase.to_sym)
-            end
-            @sigFormatter.format(signature.to_row)
+          if (!@sigFormatter)
+            @sigFormatter =  Formatter.new(output_path, @sigfile, Signature.columns, @format.to_s.downcase.to_sym)
+          end
+          @sigFormatter.format(signature.to_row)
         end
 
         # tally errors here to save time
@@ -661,11 +661,11 @@ class Repository
   private
 
     def finish_output_files
-        repoFormatter = Formatter.new(output_path, @repofile, Repository.columns, @format.to_s.downcase.to_sym)
-        repoFormatter.format(self.to_row)
-        repoFormatter.close
-        @docFormatter.close
-        @sigFormatter.close
+      repoFormatter = Formatter.new(output_path, @repofile, Repository.columns, @format.to_s.downcase.to_sym)
+      repoFormatter.format(self.to_row)
+      repoFormatter.close
+      @docFormatter.close
+      @sigFormatter.close
     end
 
     # Format all the results for the summary report
@@ -1164,38 +1164,38 @@ end
 # Default/base output Formatter
 class Formatter
 
-    def initialize(outDirPath, outDocFileName, columns, format = :csv)
-        @isFirstRow = true
+  def initialize(outDirPath, outDocFileName, columns, format = :csv)
+    @isFirstRow = true
 
-        if (outDirPath)
-            FileUtils.mkdir_p(outDirPath)
-            outDocPath = "#{outDirPath}"/outDocFileName
-            @docFile = File.open(outDocPath , "w+")
-        end
-
-        @format = format
-        mod = "#{format.to_s.capitalize}Formatter"
-        # include the formatter we need to use
-        # include Class.const_get()
-        self.class.instance_eval("include #{mod}")
-
-        @columns    = columns
-        @col_count  = columns.length
-        @docFile.print header
+    if (outDirPath)
+      FileUtils.mkdir_p(outDirPath)
+      outDocPath = "#{outDirPath}"/outDocFileName
+      @docFile = File.open(outDocPath , "w+")
     end
 
-    def format(rows)
-        @docFile.print row(rows, @isFirstRow)
-        @isFirstRow = false
-    end
+    @format = format
+    mod = "#{format.to_s.capitalize}Formatter"
+    # include the formatter we need to use
+    # include Class.const_get()
+    self.class.instance_eval("include #{mod}")
 
-    def quote(val)
-        %Q|"#{val}"|
-    end
+    @columns    = columns
+    @col_count  = columns.length
+    @docFile.print header
+  end
 
-    def close
-        @docFile.puts footer
-    end
+  def format(rows)
+    @docFile.print row(rows, @isFirstRow)
+    @isFirstRow = false
+  end
+
+  def quote(val)
+    %Q|"#{val}"|
+  end
+
+  def close
+    @docFile.puts footer
+  end
 end
 
 
