@@ -354,8 +354,6 @@ class Repository
     @sigfile          = "signatures.#{@format}"
 
     @users            = Hash.new
-    @docs             = Array.new
-    @sigs             = Array.new
 
     # results storage
     @results          = OpenStruct.new
@@ -403,18 +401,6 @@ class Repository
 
   def output_path
     @output_path ||= "output"/"#{@server_id}"/"#{output_time.strftime('%Y%m%d-%H%M%S')}"
-  end
-
-  def repofile_path
-    "#{output_path}"/@repofile
-  end
-
-  def docfile_path
-    "#{output_path}"/@docfile
-  end
-
-  def sigfile_path
-    "#{output_path}"/@sigfile
   end
 
   def config_path
@@ -476,7 +462,7 @@ class Repository
     LOG.info "\nPatentSafe Check Finished in #{@check_run_minutes} minutes"
 
     # Only produce the output files if required
-    generate_output_files if @format
+    finish_output_files if @format
     generate_summary_report
   end
 
@@ -584,8 +570,13 @@ class Repository
         @results.nohash_documents += 1 unless document.hash_exists?
 
         @results.checked_documents += 1
-        # add the doc to the array if needed
-        @docs <<  document.to_row if @docfile
+
+        if @docfile
+            if (!@docFormatter)
+                @docFormatter =  Formatter.new(output_path, @docfile, Document.columns, @format.to_s.downcase.to_sym)
+            end
+            @docFormatter.format(document.to_row)
+        end
 
         # tally errors here to save time
         if doc_errors && !doc_errors.empty?
@@ -643,7 +634,13 @@ class Repository
 
         @results.checked_signatures += 1
         # add the sig to the array if needed
-        @sigs <<  signature.to_row if @sigfile
+        #@sigs <<  signature.to_row if @sigfile
+        if @sigfile
+            if (!@sigFormatter)
+                @sigFormatter =  Formatter.new(output_path, @sigfile, Signature.columns, @format.to_s.downcase.to_sym)
+            end
+            @sigFormatter.format(signature.to_row)
+        end
 
         # tally errors here to save time
         if sig_errors && !sig_errors.empty?
@@ -661,34 +658,14 @@ class Repository
     LOG.info "** signatures checked #{'and validated' unless @skip_validation}"
   end
 
-  # Return the repository data as YAML
-  def get_repository_data_as_yaml
-    repository_data = {
-      :repository => self,
-      :documents  => @docs,
-      :signatures => @sigs
-    }
-
-    YAML::dump(repository_data)
-  end
-
-
   private
 
-    def generate_output_files
-      FileUtils.mkdir_p(output_path)
-
-      # Note this will overwrite old files
-      write_formatted_file(repofile_path, @format, Repository.columns, [self.to_row])
-      write_formatted_file(docfile_path, @format, Document.columns, @docs)
-      write_formatted_file(sigfile_path, @format, Signature.columns, @sigs)
-    end
-
-
-    def write_formatted_file(path, format, columns, data)
-      File.open(path, "w+") do |f|
-        f.puts Formatter.format(format.to_s.downcase.to_sym, columns, data)
-      end
+    def finish_output_files
+        repoFormatter = Formatter.new(output_path, @repofile, Repository.columns, @format.to_s.downcase.to_sym)
+        repoFormatter.format(self.to_row)
+        repoFormatter.close
+        @docFormatter.close
+        @sigFormatter.close
     end
 
     # Format all the results for the summary report
@@ -909,7 +886,7 @@ class Document
   end
 
   def self.columns
-    ["Document ID", "Hash"]
+    ["Document ID", "Hash", "Type", "File Name", "File Path"]
   end
 
   def to_row
@@ -1035,11 +1012,11 @@ class Signature
   end
 
   def self.columns
-    ["Signature ID", "Value"]
+    ["Signature ID", "Document ID", "Role", "Signer ID", "Signer Name", "Signer Key", "Content Path", "Content Hash", "Acceptance Text", "Signature Date", "Signature Text", "Signature Hash"]
   end
 
   def to_row
-    [signature_id, document_id, role, signer_id, signer_name, public_key, signed_content_relative_path, content_hash, wording, date,text, value]
+    [signature_id, document_id, role, signer_id, signer_name, public_key, signed_content_relative_path, content_hash, wording, date, text, value]
   end
 
   # This is the absolute path
@@ -1186,36 +1163,39 @@ end
 
 # Default/base output Formatter
 class Formatter
-  def self.format(fmt, columns, rows)
-    self.new(fmt).format(columns, rows)
-  end
 
-  def initialize(format = :csv)
-    @format = format
-    mod = "#{format.to_s.capitalize}Formatter"
-    # include the formatter we need to use
-    # include Class.const_get()
-    self.class.instance_eval("include #{mod}")
-  end
+    def initialize(outDirPath, outDocFileName, columns, format = :csv)
+        @isFirstRow = true
 
-  def format(columns, rows)
-    @columns    = columns
-    @col_count  = columns.length
-    @rows       = rows
-    @row_count  = rows.length
+        if (outDirPath)
+            FileUtils.mkdir_p(outDirPath)
+            outDocPath = "#{outDirPath}"/outDocFileName
+            @docFile = File.open(outDocPath , "w+")
+        end
 
-    out = ""
-    out << header
-    rows.each_with_index do |r, i|
-      out << row(r, i)
+        @format = format
+        mod = "#{format.to_s.capitalize}Formatter"
+        # include the formatter we need to use
+        # include Class.const_get()
+        self.class.instance_eval("include #{mod}")
+
+        @columns    = columns
+        @col_count  = columns.length
+        @docFile.print header
     end
-    out << footer
-    out
-  end
 
-  def quote(val)
-    %Q|"#{val}"|
-  end
+    def format(rows)
+        @docFile.print row(rows, @isFirstRow)
+        @isFirstRow = false
+    end
+
+    def quote(val)
+        %Q|"#{val}"|
+    end
+
+    def close
+        @docFile.puts footer
+    end
 end
 
 
@@ -1225,7 +1205,7 @@ module CsvFormatter
     @columns.map{|v| quote(v)}.join(",") + "\n"
   end
 
-  def row(r, ri)
+  def row(r, isFirstRow)
     r.map{|v| quote(v)}.join(",") + "\n"
   end
 
@@ -1238,23 +1218,22 @@ end
 # Format a 'row' in json format - makes the object look like a hash
 module JsonFormatter
   def header
-    "[\n"
+    "["
   end
 
-  def row(r, ri)
+  def row(r, isFirstRow)
     out = ""
-    out << "  {"
+    out << (isFirstRow ? "\n  {" : ",\n  {")
     @columns.each_with_index do |col, i|
        out << "#{quote(col)}:#{quote(r[i])}"
        out << (i == @col_count-1 ? "" : ",")
     end
     out << "}"
-    out << (ri == @row_count-1 ? "\n" : ",\n")
     out
   end
 
   def footer
-    "]\n"
+    "\n]\n"
   end
 end
 
