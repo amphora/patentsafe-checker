@@ -347,11 +347,11 @@ class Repository
     @verbose          = options[:verbose] || false
     @skip_validation  = options[:skip_validation]
     @repofile         = options[:repofile]
-    @format           = options[:format]
+    @format           = options[:format].to_s.downcase if options[:format]
 
-    @repofile         = "repository.#{@format}"
-    @docfile          = "documents.#{@format}"
-    @sigfile          = "signatures.#{@format}"
+    @repofile, @docfile, @sigfile = if @format
+      ["repository.#{@format}", "documents.#{@format}", "signatures.#{@format}"]
+    end
 
     @users            = Hash.new
 
@@ -573,7 +573,7 @@ class Repository
 
         if @docfile
           if (!@doc_formatter)
-            @doc_formatter =  Formatter.new(output_path, @docfile, Document.columns, @format.to_s.downcase.to_sym)
+            @doc_formatter =  Formatter.new(output_path, @docfile, Document.columns, @format)
           end
           @doc_formatter.format(document.to_row)
         end
@@ -1164,7 +1164,8 @@ end
 # Default/base output Formatter
 class Formatter
 
-  def initialize(out_dir_path, out_doc_file_name, columns, format = :csv)
+  def initialize(out_dir_path, out_doc_file_name, columns, format = "csv")
+    format        = format.to_s
     @is_first_row = true
 
     if (out_dir_path)
@@ -1173,8 +1174,7 @@ class Formatter
       @docfile = File.open(out_doc_path , "w+")
     end
 
-    @format = format
-    mod = "#{format.to_s.capitalize}Formatter"
+    mod = "#{format.capitalize}Formatter"
     # include the formatter we need to use
     # include Class.const_get()
     self.class.instance_eval("include #{mod}")
