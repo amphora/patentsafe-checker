@@ -1165,19 +1165,16 @@ end
 class Formatter
 
   def initialize(out_dir_path, out_doc_file_name, columns, format = "csv")
-    format        = format.to_s
     @is_first_row = true
+
+    # include the formatter we need to use
+    self.class.instance_eval("include #{format.to_s.capitalize}Formatter")
 
     if (out_dir_path)
       FileUtils.mkdir_p(out_dir_path)
       out_doc_path = "#{out_dir_path}"/out_doc_file_name
       @docfile = File.open(out_doc_path , "w+")
     end
-
-    mod = "#{format.capitalize}Formatter"
-    # include the formatter we need to use
-    # include Class.const_get()
-    self.class.instance_eval("include #{mod}")
 
     @columns    = columns
     @col_count  = columns.length
