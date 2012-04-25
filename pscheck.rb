@@ -572,9 +572,7 @@ class Repository
         @results.checked_documents += 1
 
         if @docfile
-          if (!@doc_formatter)
-            @doc_formatter =  Formatter.new(output_path, @docfile, Document.columns, @format)
-          end
+          @doc_formatter ||= Formatter.new(output_path, @docfile, Document.columns, @format)          end
           @doc_formatter.format(document.to_row)
         end
 
@@ -636,9 +634,7 @@ class Repository
         # add the sig to the array if needed
         #@sigs <<  signature.to_row if @sigfile
         if @sigfile
-          if (!@sig_formatter)
-            @sig_formatter =  Formatter.new(output_path, @sigfile, Signature.columns, @format.to_s.downcase.to_sym)
-          end
+          @sig_formatter ||= Formatter.new(output_path, @sigfile, Signature.columns, @format.to_s.downcase.to_sym)
           @sig_formatter.format(signature.to_row)
         end
 
