@@ -347,11 +347,11 @@ class Repository
     @verbose          = options[:verbose] || false
     @skip_validation  = options[:skip_validation]
     @repofile         = options[:repofile]
-    @format           = options[:format]
+    @format           = options[:format].to_s.downcase if options[:format]
 
-    @repofile         = "repository.#{@format}"
-    @docfile          = "documents.#{@format}"
-    @sigfile          = "signatures.#{@format}"
+    @repofile, @docfile, @sigfile = if @format
+      ["repository.#{@format}", "documents.#{@format}", "signatures.#{@format}"]
+    end
 
     @users            = Hash.new
 
@@ -572,10 +572,8 @@ class Repository
         @results.checked_documents += 1
 
         if @docfile
-            if (!@docFormatter)
-                @docFormatter =  Formatter.new(output_path, @docfile, Document.columns, @format.to_s.downcase.to_sym)
-            end
-            @docFormatter.format(document.to_row)
+          @doc_formatter ||= Formatter.new(output_path, @docfile, Document.columns, @format)          end
+          @doc_formatter.format(document.to_row)
         end
 
         # tally errors here to save time
@@ -636,10 +634,8 @@ class Repository
         # add the sig to the array if needed
         #@sigs <<  signature.to_row if @sigfile
         if @sigfile
-            if (!@sigFormatter)
-                @sigFormatter =  Formatter.new(output_path, @sigfile, Signature.columns, @format.to_s.downcase.to_sym)
-            end
-            @sigFormatter.format(signature.to_row)
+          @sig_formatter ||= Formatter.new(output_path, @sigfile, Signature.columns, @format.to_s.downcase.to_sym)
+          @sig_formatter.format(signature.to_row)
         end
 
         # tally errors here to save time
@@ -661,11 +657,11 @@ class Repository
   private
 
     def finish_output_files
-        repoFormatter = Formatter.new(output_path, @repofile, Repository.columns, @format.to_s.downcase.to_sym)
-        repoFormatter.format(self.to_row)
-        repoFormatter.close
-        @docFormatter.close
-        @sigFormatter.close
+      repoFormatter = Formatter.new(output_path, @repofile, Repository.columns, @format.to_s.downcase.to_sym)
+      repoFormatter.format(self.to_row)
+      repoFormatter.close
+      @doc_formatter.close
+      @sig_formatter.close
     end
 
     # Format all the results for the summary report
@@ -1164,38 +1160,35 @@ end
 # Default/base output Formatter
 class Formatter
 
-    def initialize(outDirPath, outDocFileName, columns, format = :csv)
-        @isFirstRow = true
+  def initialize(out_dir_path, out_doc_file_name, columns, format = "csv")
+    @is_first_row = true
 
-        if (outDirPath)
-            FileUtils.mkdir_p(outDirPath)
-            outDocPath = "#{outDirPath}"/outDocFileName
-            @docFile = File.open(outDocPath , "w+")
-        end
+    # include the formatter we need to use
+    self.class.instance_eval("include #{format.to_s.capitalize}Formatter")
 
-        @format = format
-        mod = "#{format.to_s.capitalize}Formatter"
-        # include the formatter we need to use
-        # include Class.const_get()
-        self.class.instance_eval("include #{mod}")
-
-        @columns    = columns
-        @col_count  = columns.length
-        @docFile.print header
+    if (out_dir_path)
+      FileUtils.mkdir_p(out_dir_path)
+      out_doc_path = "#{out_dir_path}"/out_doc_file_name
+      @docfile = File.open(out_doc_path , "w+")
     end
 
-    def format(rows)
-        @docFile.print row(rows, @isFirstRow)
-        @isFirstRow = false
-    end
+    @columns    = columns
+    @col_count  = columns.length
+    @docfile.print header
+  end
 
-    def quote(val)
-        %Q|"#{val}"|
-    end
+  def format(rows)
+    @docfile.print row(rows, @is_first_row)
+    @is_first_row = false
+  end
 
-    def close
-        @docFile.puts footer
-    end
+  def quote(val)
+    %Q|"#{val}"|
+  end
+
+  def close
+    @docfile.puts footer
+  end
 end
 
 
@@ -1205,7 +1198,7 @@ module CsvFormatter
     @columns.map{|v| quote(v)}.join(",") + "\n"
   end
 
-  def row(r, isFirstRow)
+  def row(r, is_first_row)
     r.map{|v| quote(v)}.join(",") + "\n"
   end
 
@@ -1221,9 +1214,9 @@ module JsonFormatter
     "["
   end
 
-  def row(r, isFirstRow)
+  def row(r, is_first_row)
     out = ""
-    out << (isFirstRow ? "\n  {" : ",\n  {")
+    out << (is_first_row ? "\n  {" : ",\n  {")
     @columns.each_with_index do |col, i|
        out << "#{quote(col)}:#{quote(r[i])}"
        out << (i == @col_count-1 ? "" : ",")
