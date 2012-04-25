@@ -572,10 +572,10 @@ class Repository
         @results.checked_documents += 1
 
         if @docfile
-          if (!@docFormatter)
-            @docFormatter =  Formatter.new(output_path, @docfile, Document.columns, @format.to_s.downcase.to_sym)
+          if (!@doc_formatter)
+            @doc_formatter =  Formatter.new(output_path, @docfile, Document.columns, @format.to_s.downcase.to_sym)
           end
-          @docFormatter.format(document.to_row)
+          @doc_formatter.format(document.to_row)
         end
 
         # tally errors here to save time
@@ -636,10 +636,10 @@ class Repository
         # add the sig to the array if needed
         #@sigs <<  signature.to_row if @sigfile
         if @sigfile
-          if (!@sigFormatter)
-            @sigFormatter =  Formatter.new(output_path, @sigfile, Signature.columns, @format.to_s.downcase.to_sym)
+          if (!@sig_formatter)
+            @sig_formatter =  Formatter.new(output_path, @sigfile, Signature.columns, @format.to_s.downcase.to_sym)
           end
-          @sigFormatter.format(signature.to_row)
+          @sig_formatter.format(signature.to_row)
         end
 
         # tally errors here to save time
@@ -664,8 +664,8 @@ class Repository
       repoFormatter = Formatter.new(output_path, @repofile, Repository.columns, @format.to_s.downcase.to_sym)
       repoFormatter.format(self.to_row)
       repoFormatter.close
-      @docFormatter.close
-      @sigFormatter.close
+      @doc_formatter.close
+      @sig_formatter.close
     end
 
     # Format all the results for the summary report
@@ -1164,13 +1164,13 @@ end
 # Default/base output Formatter
 class Formatter
 
-  def initialize(outDirPath, outDocFileName, columns, format = :csv)
-    @isFirstRow = true
+  def initialize(out_dir_path, out_doc_file_name, columns, format = :csv)
+    @is_first_row = true
 
-    if (outDirPath)
-      FileUtils.mkdir_p(outDirPath)
-      outDocPath = "#{outDirPath}"/outDocFileName
-      @docFile = File.open(outDocPath , "w+")
+    if (out_dir_path)
+      FileUtils.mkdir_p(out_dir_path)
+      out_doc_path = "#{out_dir_path}"/out_doc_file_name
+      @docFile = File.open(out_doc_path , "w+")
     end
 
     @format = format
@@ -1185,8 +1185,8 @@ class Formatter
   end
 
   def format(rows)
-    @docFile.print row(rows, @isFirstRow)
-    @isFirstRow = false
+    @docFile.print row(rows, @is_first_row)
+    @is_first_row = false
   end
 
   def quote(val)
@@ -1205,7 +1205,7 @@ module CsvFormatter
     @columns.map{|v| quote(v)}.join(",") + "\n"
   end
 
-  def row(r, isFirstRow)
+  def row(r, is_first_row)
     r.map{|v| quote(v)}.join(",") + "\n"
   end
 
@@ -1221,9 +1221,9 @@ module JsonFormatter
     "["
   end
 
-  def row(r, isFirstRow)
+  def row(r, is_first_row)
     out = ""
-    out << (isFirstRow ? "\n  {" : ",\n  {")
+    out << (is_first_row ? "\n  {" : ",\n  {")
     @columns.each_with_index do |col, i|
        out << "#{quote(col)}:#{quote(r[i])}"
        out << (i == @col_count-1 ? "" : ",")
