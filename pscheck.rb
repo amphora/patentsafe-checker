@@ -1170,7 +1170,7 @@ class Formatter
     if (out_dir_path)
       FileUtils.mkdir_p(out_dir_path)
       out_doc_path = "#{out_dir_path}"/out_doc_file_name
-      @docFile = File.open(out_doc_path , "w+")
+      @docfile = File.open(out_doc_path , "w+")
     end
 
     @format = format
@@ -1181,11 +1181,11 @@ class Formatter
 
     @columns    = columns
     @col_count  = columns.length
-    @docFile.print header
+    @docfile.print header
   end
 
   def format(rows)
-    @docFile.print row(rows, @is_first_row)
+    @docfile.print row(rows, @is_first_row)
     @is_first_row = false
   end
 
@@ -1194,7 +1194,7 @@ class Formatter
   end
 
   def close
-    @docFile.puts footer
+    @docfile.puts footer
   end
 end
 
