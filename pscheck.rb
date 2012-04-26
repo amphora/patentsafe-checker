@@ -1160,7 +1160,7 @@ end
 # Default/base output Formatter
 class Formatter
 
-  def initialize(out_dir_path, out_doc_file_name, columns, format = "csv")
+  def initialize(out_dir_path, out_file_name, columns, format = "csv")
     @is_first_row = true
 
     # include the formatter we need to use
@@ -1168,17 +1168,17 @@ class Formatter
 
     if (out_dir_path)
       FileUtils.mkdir_p(out_dir_path)
-      out_doc_path = "#{out_dir_path}"/out_doc_file_name
-      @docfile = File.open(out_doc_path , "w+")
+      out_path = "#{out_dir_path}"/out_file_name
+      @out_file = File.open(out_path , "w+")
     end
 
     @columns    = columns
     @col_count  = columns.length
-    @docfile.print header
+    @out_file.print header
   end
 
   def format(rows)
-    @docfile.print row(rows, @is_first_row)
+    @out_file.print row(rows, @is_first_row)
     @is_first_row = false
   end
 
@@ -1187,7 +1187,8 @@ class Formatter
   end
 
   def close
-    @docfile.puts footer
+    @out_file.print footer
+    @out_file.close
   end
 end
 
