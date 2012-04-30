@@ -153,9 +153,20 @@ class HostedChecker
   # Get all the directories in base_path and see if there's something in path_suffix
   # If there is, run against it
   def process_command
-    # Create a queue of the Paths we want to check. Queue's are threadsafe arrays for our purposes.
-    # Skip dot directories
-    Dir.new(@base_path).entries.each { |d| @queue << d unless d[0..0] == "." }
+    # Create a queue of the Paths we want to check. Queues are threadsafe arrays for our purposes.
+    Dir.new(@base_path).entries.each { |dir|
+      if (dir[0..0] == "." || dir == "lost+found")
+        next # Quietly skip system directories
+      end
+      repo_dir = "#{@base_path}/#{dir}/#{@path_suffix}"
+      if File.exists?("#{repo_dir}/disable_checker")
+        LOG.info "========================================================================================================================"
+        LOG.info "Not Running on #{repo_dir} because disable_checker is present"
+        LOG.info "========================================================================================================================"
+        next
+      end
+      @queue << repo_dir
+    }
 
     # Get the hostname in case we need to submit to the repository monitor
     @hostname = %x{hostname -s}.strip
@@ -175,71 +186,41 @@ class HostedChecker
 
   def checker_worker
     LOG.info "Checker worker started #{Thread.current.to_s}"
-    z = ""
+    repo_path = ""
 
     until @queue.empty? do
-      z = @queue.pop # get the next block of work (directory)
+      repo_path = @queue.pop # get the next directory path to check
 
-      LOG.info "Working on #{z}"
+      LOG.info "Working on #{repo_path}"
 
-      puts "Checker worker running on #{z} remaining=#{@queue.size} thread=#{Thread.current.to_s}"
+      puts "Checker worker running on #{repo_path} remaining=#{@queue.size} thread=#{Thread.current.to_s}"
 
       # Run the checker
-      repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
-      if File.exists?(repository_directory)
-        if File.exists?("#{repository_directory}/disable_checker")
-          LOG.info "========================================================================================================================"
-          LOG.info "Not Running on #{repository_directory} because disable_checker is present"
-          LOG.info "========================================================================================================================"
-        else
-          # Get a value to play with and remove from the array
-          z = $to_check.delete_at(0)
-          LOG.info "Working on #{z}"
-        end
-      end # End waiting on the Mutex
-
-      puts "Checker worker running on #{z} remaining=#{$to_check.size} thread=#{Thread.current.to_s}"
-
-      # If we have a value then do something (and don't run on invisible directories)
-      if not(done) && z[0..0] != "."
-        # Run the checker
-        repository_directory = "#{@base_path}/#{z}/#{@path_suffix}"
-        if File.exists?(repository_directory)
-          if File.exists?("#{repository_directory}/disable_checker")
-            LOG.info "========================================================================================================================"
-            LOG.info "Not Running on #{repository_directory} because disable_checker is present"
-            LOG.info "========================================================================================================================"
-          else
-            LOG.info "========================================================================================================================"
-            LOG.info "Running on #{repository_directory}"
-            LOG.info "========================================================================================================================"
-            begin
-              repo = Repository.new(:base_path => repository_directory, :verbose => @options.verbose)
-              repo.check
-              # Upload the repository data to the main database if required
-              if @options.uploadurl
-                repository_status = repo.get_repository_data_as_yaml
-                puts "Uploading data"
-                # puts repository_status
-                # TODO This needs to handle https
-                res = Net::HTTP.post_form(URI.parse(@options.uploadurl), 
-                { 'hostname'=> @hostname, 
-                  'repository_directory' => repository_directory, 
-                  'repository_status' => repository_status
-                  })
-                  puts "Uploaded data result from upload is #{res.body.strip}"
-                  LOG.info "Uploaded data result from upload is #{res.body.strip}"
-                end
-            rescue
-              LOG.error "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-              LOG.error "Error Running on #{repository_directory}"
-              LOG.error "#{$!}"
-              LOG.error "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            end
+      LOG.info "========================================================================================================================"
+      LOG.info "Running on #{repo_path}"
+      LOG.info "========================================================================================================================"
+      begin
+        repo = Repository.new(:base_path => repo_path, :verbose => @options.verbose)
+        repo.check
+        # Upload the repository data to the main database if required
+        if @options.uploadurl
+          repository_status = repo.get_repository_data_as_yaml
+          puts "Uploading data"
+          # puts repository_status
+          # TODO This needs to handle https
+          res = Net::HTTP.post_form(URI.parse(@options.uploadurl), 
+          { 'hostname'=> @hostname, 
+            'repository_directory' => repo_path, 
+            'repository_status' => repository_status
+            })
+            puts "Uploaded data result from upload is #{res.body.strip}"
+            LOG.info "Uploaded data result from upload is #{res.body.strip}"
           end
-        end
-      else
-        LOG.info "**** No directory #{repository_directory}"
+      rescue
+        LOG.error "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        LOG.error "Error Running on #{repo_path}"
+        LOG.error "#{$!}"
+        LOG.error "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
       end
 
     end # queue loop
