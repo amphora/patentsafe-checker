@@ -1126,7 +1126,7 @@ class Events
 
   def last
     last_line = ""
-    File.open(@path, 'r+'){ |f| f.each { |line| last_line = line } } if exists?
+    File.open(@path, 'r'){ |f| f.each { |line| last_line = line } } if exists?
     Event.new(:path => @path, :content => last_line, :verbose => @verbose)
   end
 
