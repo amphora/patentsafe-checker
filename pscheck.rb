@@ -685,7 +685,21 @@ class Repository
         LOG.warn "Signature packets skipped: #{@results.known_signatures_skipped}"
       end
       LOG.warn ""
-      unless @results.errors.empty?
+
+      hasErrors =
+        @results.missing_documents > 0 ||
+        @results.corrupt_documents > 0 ||
+        @results.invalid_document_hashes > 0 ||
+        @results.skipped_documents > 0 ||
+        @results.corrupt_signatures > 0 ||
+        @results.missing_keys > 0 ||
+        @results.missing_signatures > 0 ||
+        @results.invalid_signature_texts > 0 ||
+        @results.invalid_content_hashes > 0 ||
+        @results.invalid_signatures > 0 || openssl_sha512? ||
+        @results.skipped_signatures > 0
+
+      if !@results.errors.empty? || hasErrors
         LOG.warn "-- Errors --"
         LOG.warn " Missing documents:         #{@results.missing_documents}" if @results.missing_documents > 0
         LOG.warn " Corrupt documents:         #{@results.corrupt_documents}" if @results.corrupt_documents > 0
@@ -700,6 +714,7 @@ class Repository
         LOG.warn " Skipped signatures*:       #{@results.skipped_signatures}" if @results.skipped_signatures > 0
         LOG.warn ""
       end
+
       LOG.warn "-- Successful checks --"
       LOG.warn " Documents w/o hash:        #{@results.nohash_documents}" if @results.nohash_documents > 0
       LOG.warn " Document hashes:           #{dtotal - @results.invalid_document_hashes - @results.nohash_documents}" if !@skip_validation && openssl_sha512?
@@ -992,6 +1007,8 @@ class Signature
 
     if @path && parse_xml
       root              = @xml.root
+      raise REXML::ParseException, "Unable to create XML parser, possibly empty file? : " unless root
+
       @signature_id     = root.attribute("sigId").to_s
       @document_id      = @signature_id[0..13] # first 13 characters
       @signer_id        = root.elements["signer"].attribute("userId").value()
