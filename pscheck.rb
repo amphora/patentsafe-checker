@@ -621,11 +621,18 @@ class Repository
           # perform validation
           sig_errors = signature.validate
 
-          # check if user public key can be found
-          if @users[signature.signer_id] && @users[signature.signer_id].keys.include?(signature.public_key)
+          # First try with the origin server ID and username in serverid_userid format first,
+          # to avoid any ambiguity if there is another user, with the same ID on the target server.
+          server_signer_id = signature.signer_id.include?('_') ? nil : "#{signature.server_id}_#{signature.signer_id}"
+
+          # We run this special case only if there's no server ID embedded in the user name in the first place, otherwise it's a normal check
+          if (server_signer_id && @users[server_signer_id])
+            # this is an imported user so there is no public key to verify against hence we're happy with this one
+          elsif @users[signature.signer_id] && @users[signature.signer_id].keys.include?(signature.public_key)
+            # check if user public key can be found
             LOG.info "  - OK:  User public key is consistent with database"
           else
-            LOG.error "  - ERROR: #{signature.signature_id unless @verbose} User public key not found (this may not be a problem - make sure you can find the identity certificate)"
+            LOG.error "  - ERROR: #{signature.signature_id unless @verbose} User public key not found: #{signature.signer_id}/#{signature.server_id} (this may not be a problem - make sure you can find the identity certificate)"
             sig_errors[:missing_key] = {signature.public_key => signature.signer_id}
           end
         end
@@ -997,7 +1004,7 @@ class Signature
   # signer attributes
   attr_reader :signer_id, :signer_name, :public_key, :role
   # signature attributes
-  attr_reader :signature_id, :document_id, :content_filename, :content_hash, :wording, :date, :text, :value
+  attr_reader :signature_id, :server_id, :document_id, :content_filename, :content_hash, :wording, :date, :text, :value
 
   def initialize(options={})
     extract options
@@ -1010,6 +1017,7 @@ class Signature
       raise REXML::ParseException, "Unable to create XML parser, possibly empty file? : " unless root
 
       @signature_id     = root.attribute("sigId").to_s
+      @server_id        = @signature_id[0..5].downcase
       @document_id      = @signature_id[0..13] # first 13 characters
       @signer_id        = root.elements["signer"].attribute("userId").value()
       @signer_name      = root.get_text("signer").value()
