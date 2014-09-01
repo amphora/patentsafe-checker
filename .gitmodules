@@ -1,3 +1,0 @@
-[submodule "test/fixtures/ps-repositories"]
-	path = test/fixtures/ps-repositories
-	url = git@github.com:amphora/ps-repositories.git

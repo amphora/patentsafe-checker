@@ -9,3 +9,12 @@ Repo-*
 Docs-*
 Sigs-*
 
+.idea/.name
+.idea/.rakeTasks
+.idea/encodings.xml
+.idea/misc.xml
+.idea/modules.xml
+.idea/patentsafe-checker.iml
+.idea/vcs.xml
+.idea/workspace.xml
+.idea/scopes/scope_settings.xml
