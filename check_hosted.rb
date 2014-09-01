@@ -10,7 +10,7 @@
 #
 #     ruby check_hosted.rb /base/dir path/suffix
 #
-#     On Duane run "ruby check_hosted.rb /zones root/export/home/apps/patentsafe" as root
+#     On typical servers run "ruby check_hosted.rb /servers patentsafe" as root
 #
 # == Usage
 #   check_hosted.rb [options] base_directory path_inside_each_hit
@@ -24,7 +24,7 @@
 #   Amphora Research Systems, Ltd.
 #
 # == Copyright
-#   Copyright (c) 2006-2012 Amphora Research Systems Ltd.
+#   Copyright (c) 2006-2014 Amphora Research Systems Ltd.
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
 #   the Free Software Foundation, either version 3 of the License, or
